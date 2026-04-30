@@ -1197,8 +1197,9 @@ function tabFilter(section, estatus, btn) {
 async function renderApartados() {
   const cont = document.getElementById('lista-apartados');
   cont.innerHTML = '<div class="loading"><div class="spinner"></div>Cargando...</div>';
-  const { data } = await db.from('bs_apartados').select('*').eq('estatus', currentFiltroApartados).order('creado', { ascending: false });
-  if (!data || !data.length) { cont.innerHTML = '<div class="empty-state"><span class="icon">◑</span><p>Sin apartados</p></div>'; return; }
+  try {
+  const { data, error } = await db.from('bs_apartados').select('*').eq('estatus', currentFiltroApartados).order('creado', { ascending: false });
+  if (error || !data || !data.length) { cont.innerHTML = '<div class="empty-state"><span class="icon">◑</span><p>Sin apartados</p></div>'; return; }
   cont.innerHTML = data.map(a => {
     const pct = a.monto_total > 0 ? Math.round((a.monto_total - a.saldo) / a.monto_total * 100) : 0;
     return `<div class="table-card" style="margin-bottom:12px"><div style="padding:16px 20px">
@@ -1220,6 +1221,7 @@ async function renderApartados() {
       </div>`:''}
     </div></div>`;
   }).join('');
+  } catch(e) { cont.innerHTML = '<div class="empty-state"><span class="icon">◑</span><p>Sin apartados</p></div>'; }
 }
 async function completarApartado(id) {
   await db.from('bs_apartados').update({ estatus:'completado', saldo:0 }).eq('id', id);
@@ -1243,8 +1245,9 @@ async function guardarCredito() {
 async function renderCreditos() {
   const cont = document.getElementById('lista-creditos');
   cont.innerHTML = '<div class="loading"><div class="spinner"></div>Cargando...</div>';
-  const { data } = await db.from('bs_creditos').select('*').eq('estatus', currentFiltroCreditos).order('creado', { ascending: false });
-  if (!data || !data.length) { cont.innerHTML = '<div class="empty-state"><span class="icon">◐</span><p>Sin créditos</p></div>'; return; }
+  try {
+  const { data, error } = await db.from('bs_creditos').select('*').eq('estatus', currentFiltroCreditos).order('creado', { ascending: false });
+  if (error || !data || !data.length) { cont.innerHTML = '<div class="empty-state"><span class="icon">◐</span><p>Sin créditos</p></div>'; return; }
   cont.innerHTML = data.map(cr => {
     const pct = cr.monto_total > 0 ? Math.round((cr.monto_total - cr.saldo) / cr.monto_total * 100) : 0;
     return `<div class="table-card" style="margin-bottom:12px"><div style="padding:16px 20px">
@@ -1265,6 +1268,7 @@ async function renderCreditos() {
       </div>`:''}
     </div></div>`;
   }).join('');
+  } catch(e) { cont.innerHTML = '<div class="empty-state"><span class="icon">◐</span><p>Sin créditos</p></div>'; }
 }
 async function liquidarCredito(id) {
   await db.from('bs_creditos').update({ estatus:'liquidado', saldo:0 }).eq('id', id);
@@ -1552,16 +1556,24 @@ function setElecView(v) { currentElecView = v; renderElecCatalogo(); }
 
 // VENTA ELECTRÓNICOS
 async function renderElecVentaPage() {
-  await Promise.all([loadElectronicos(), loadClientes()]);
-  renderElecListaVenta(electronicos);
-  const sel = document.getElementById('elec-venta-cliente');
-  sel.innerHTML = '<option value="">Sin cliente</option>';
-  clientes.forEach(c => sel.innerHTML += `<option value="${c.id}">${c.nombre}</option>`);
-  renderElecCart();
+  try {
+    await Promise.all([loadElectronicos(), loadClientes()]);
+    renderElecListaVenta(electronicos);
+    const sel = document.getElementById('elec-venta-cliente');
+    if (sel) {
+      sel.innerHTML = '<option value="">Sin cliente</option>';
+      clientes.forEach(c => sel.innerHTML += `<option value="${c.id}">${c.nombre}</option>`);
+    }
+    renderElecCart();
+  } catch(e) {
+    const cont = document.getElementById('elec-lista-venta');
+    if (cont) cont.innerHTML = '<div class="empty-state"><span class="icon">📺</span><p>Sin productos aún</p></div>';
+  }
 }
 function renderElecListaVenta(list) {
   const cont = document.getElementById('elec-lista-venta');
-  if (!list.length) { cont.innerHTML = '<div class="empty-state"><span class="icon">📺</span><p>Sin productos</p></div>'; return; }
+  if (!cont) return;
+  if (!list || !list.length) { cont.innerHTML = '<div class="empty-state"><span class="icon">📺</span><p>Sin productos electrónicos aún. Agrégalos desde Catálogo.</p></div>'; return; }
   cont.innerHTML = `<table><thead><tr><th>Producto</th><th>Stock</th><th>Precio</th><th></th></tr></thead><tbody>
   ${list.map(e => `<tr>
     <td><div class="product-cell"><div class="product-thumb">${e.foto_url?`<img src="${e.foto_url}">`:'📺'}</div>
@@ -1744,10 +1756,11 @@ async function renderLog() {
   const tbody = document.getElementById('tabla-log');
   if (!tbody) return;
   tbody.innerHTML = '<tr><td colspan="5"><div class="loading"><div class="spinner"></div>Cargando...</div></td></tr>';
+  try {
   let query = db.from('bs_log').select('*').order('fecha', { ascending: false }).limit(200);
   if (filtroLog !== 'all') query = query.eq('accion', filtroLog);
-  const { data } = await query;
-  if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><span class="icon">📋</span><p>Sin registros</p></div></td></tr>'; return; }
+  const { data, error } = await query;
+  if (error || !data || !data.length) { tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><span class="icon">📋</span><p>Sin registros aún</p></div></td></tr>'; return; }
   const accionBadge = { crear:'badge-green', editar:'badge-yellow', eliminar:'badge-red', venta:'badge-gold', pago:'badge-green', login:'badge-gold' };
   tbody.innerHTML = data.map(r => `<tr>
     <td style="font-size:.72rem;white-space:nowrap">${new Date(r.fecha).toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'})}</td>
@@ -1756,6 +1769,7 @@ async function renderLog() {
     <td style="color:var(--text-muted);font-size:.75rem">${r.tabla||'—'}</td>
     <td style="font-size:.78rem">${r.descripcion||'—'}</td>
   </tr>`).join('');
+  } catch(e) { tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><span class="icon">📋</span><p>Sin registros</p></div></td></tr>'; }
 }
 function filtrarLog(f, btn) {
   filtroLog = f;
