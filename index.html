@@ -246,6 +246,7 @@
       <div class="nav-item" onclick="navigate('historial',this)"><span class="nav-icon">◎</span> Historial</div>
       <div class="nav-section">Clientes</div>
       <div class="nav-item" onclick="navigate('clientes',this)"><span class="nav-icon">⬡</span> Clientes</div>
+      <div class="nav-item" id="nav-mis-ventas" style="display:none" onclick="navigate('mis-ventas',this)"><span class="nav-icon">💰</span> Mis Ventas</div>
       <div class="nav-item" onclick="navigate('apartados',this)"><span class="nav-icon">◑</span> Apartados <span class="nav-badge" id="badge-apartados" style="display:none"></span></div>
       <div class="nav-item" onclick="navigate('creditos',this)"><span class="nav-icon">◐</span> Créditos <span class="nav-badge" id="badge-creditos" style="display:none"></span></div>
       <div class="nav-item" id="nav-log" style="display:none" onclick="navigate('log',this)"><span class="nav-icon">📋</span> Log Admin</div>
@@ -359,11 +360,31 @@
             <div class="cart-header"><div class="cart-title">🛒 Venta Actual</div></div>
             <div class="cart-items" id="cart-items"><div class="cart-empty">Sin productos</div></div>
             <div class="cart-footer">
-              <div class="cart-total"><span class="cart-total-label">Total</span><span class="cart-total-value" id="cart-total">$0.00</span></div>
-              <div class="form-group" style="margin-bottom:10px"><label>Tipo de pago</label>
-                <select id="tipo-pago"><option value="contado">Contado</option><option value="apartado">Apartado</option><option value="credito">Crédito</option></select>
+              <div class="cart-total"><span class="cart-total-label">Subtotal</span><span class="cart-total-value" id="cart-total">$0.00</span></div>
+              <div id="cart-descuento-info" style="display:none;font-size:.72rem;color:#4CAF7C;margin-bottom:8px">✓ Descuento 5% aplicado</div>
+              <div id="cart-credito-info" style="display:none;font-size:.72rem;color:var(--gold);margin-bottom:8px;line-height:1.6"></div>
+              <div class="cart-total" style="margin-bottom:12px">
+                <span class="cart-total-label" style="font-weight:600">Total Final</span>
+                <span class="cart-total-value" id="cart-total-final" style="font-size:1.5rem">$0.00</span>
               </div>
-              <div class="form-group" style="margin-bottom:10px"><label>Cliente (opcional)</label>
+              <div class="form-group" style="margin-bottom:10px"><label>Tipo de pago</label>
+                <select id="tipo-pago" onchange="actualizarResumenVenta()">
+                  <option value="contado">Contado</option>
+                  <option value="apartado">Apartado</option>
+                  <option value="credito">Crédito</option>
+                </select>
+              </div>
+              <div id="credito-opciones" style="display:none">
+                <div class="form-group" style="margin-bottom:10px"><label>Plazo</label>
+                  <select id="credito-semanas" onchange="actualizarResumenVenta()">
+                    <option value="4">4 semanas (+20%)</option>
+                    <option value="6">6 semanas (+25%)</option>
+                    <option value="8">8 semanas (+30%)</option>
+                    <option value="12">12 semanas (+35%)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group" style="margin-bottom:10px"><label>Cliente</label>
                 <select id="venta-cliente"><option value="">Sin cliente</option></select>
               </div>
               <button class="btn btn-gold" style="width:100%" onclick="finalizarVenta()">Finalizar Venta</button>
@@ -444,6 +465,23 @@
         <div class="table-card">
           <table><thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Módulo</th><th>Descripción</th></tr></thead>
           <tbody id="tabla-log"><tr><td colspan="5"><div class="loading"><div class="spinner"></div>Cargando...</div></td></tr></tbody></table>
+        </div>
+      </div>
+
+      <!-- MIS VENTAS (vendedor) -->
+      <div class="page" id="page-mis-ventas">
+        <div class="section-header">
+          <div><div class="gold-line"></div><div class="section-title">Mis Ventas y Comisiones</div></div>
+        </div>
+        <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:20px">
+          <div class="stat-card"><div class="stat-label">Ventas del Mes</div><div class="stat-value" id="mv-total-ventas">$0</div><div class="stat-sub">en ventas</div></div>
+          <div class="stat-card"><div class="stat-label">Comisión (10%)</div><div class="stat-value" id="mv-total-comision" style="color:#4CAF7C">$0</div><div class="stat-sub">ganado</div></div>
+          <div class="stat-card"><div class="stat-label">Num. Ventas</div><div class="stat-value" id="mv-num-ventas">0</div><div class="stat-sub">este mes</div></div>
+        </div>
+        <div class="table-card">
+          <div class="table-header"><div class="table-title">Historial de Mis Ventas</div></div>
+          <table><thead><tr><th>Fecha</th><th>Productos</th><th>Total</th><th>Tipo</th><th>Comisión</th></tr></thead>
+          <tbody id="tabla-mis-ventas"><tr><td colspan="5"><div class="loading"><div class="spinner"></div>Cargando...</div></td></tr></tbody></table>
         </div>
       </div>
 
@@ -1051,6 +1089,7 @@ function renderCart() {
       </div>
     </div>`).join('');
   totalEl.textContent = '$' + cart.reduce((s,x) => s + x.precio*x.qty, 0).toFixed(2);
+  actualizarResumenVenta();
 }
 function cambiarQty(id, delta) {
   const item = cart.find(x => x.id === id); if (!item) return;
@@ -1062,40 +1101,98 @@ function cambiarQty(id, delta) {
 }
 function removerCart(id) { cart = cart.filter(x => x.id !== id); renderCart(); }
 
+// ── Cálculo de resumen de venta ──
+function calcularResumenVenta() {
+  const subtotal = cart.reduce((s,x) => s + x.precio*x.qty, 0);
+  const tipo = document.getElementById('tipo-pago')?.value || 'contado';
+  const semanas = parseInt(document.getElementById('credito-semanas')?.value || '4');
+  let descuento = 0, interes = 0, anticipo = 0, totalFinal = subtotal;
+
+  if (tipo === 'contado' && subtotal >= 5000) {
+    descuento = subtotal * 0.05;
+    totalFinal = subtotal - descuento;
+  }
+  if (tipo === 'credito') {
+    anticipo = subtotal * 0.10;
+    const pcts = {4:0.20, 6:0.25, 8:0.30, 12:0.35};
+    interes = (subtotal - anticipo) * (pcts[semanas] || 0.20);
+    totalFinal = subtotal + interes;
+  }
+  if (tipo === 'apartado') { totalFinal = subtotal; }
+  return { subtotal, descuento, interes, anticipo, totalFinal, semanas, tipo };
+}
+
+function actualizarResumenVenta() {
+  const r = calcularResumenVenta();
+  const tipo = r.tipo;
+  // show/hide credit options
+  const creditOpts = document.getElementById('credito-opciones');
+  if (creditOpts) creditOpts.style.display = tipo === 'credito' ? '' : 'none';
+  // descuento info
+  const descInfo = document.getElementById('cart-descuento-info');
+  if (descInfo) descInfo.style.display = r.descuento > 0 ? '' : 'none';
+  // credito info
+  const credInfo = document.getElementById('cart-credito-info');
+  if (credInfo) {
+    if (tipo === 'credito') {
+      credInfo.style.display = '';
+      credInfo.innerHTML = `Anticipo requerido: <strong style="color:var(--gold)">$${r.anticipo.toFixed(2)}</strong><br>Interés (${r.semanas} sem): <strong>+$${r.interes.toFixed(2)}</strong>`;
+    } else { credInfo.style.display = 'none'; }
+  }
+  const totalFinalEl = document.getElementById('cart-total-final');
+  if (totalFinalEl) totalFinalEl.textContent = '$' + r.totalFinal.toFixed(2);
+}
+
 async function finalizarVenta() {
   if (!cart.length) { toast('Agrega productos al carrito', 'error'); return; }
-  const tipo = document.getElementById('tipo-pago').value;
+  const r = calcularResumenVenta();
   const clienteId = document.getElementById('venta-cliente').value || null;
-  const total = cart.reduce((s,x) => s + x.precio*x.qty, 0);
-  if ((tipo === 'apartado' || tipo === 'credito') && !clienteId) { toast('Selecciona un cliente para ' + tipo, 'error'); return; }
+  if ((r.tipo === 'apartado' || r.tipo === 'credito') && !clienteId) { toast('Selecciona un cliente para ' + r.tipo, 'error'); return; }
 
-  // Insert venta
-  const { data: ventaData, error: ventaError } = await db.from('bs_ventas').insert({ cliente_id: clienteId, total, tipo, estatus: tipo === 'contado' ? 'completada' : tipo }).select().single();
+  const ventaPayload = {
+    cliente_id: clienteId,
+    total: r.subtotal,
+    total_final: r.totalFinal,
+    descuento: r.descuento,
+    anticipo: r.anticipo,
+    semanas: r.tipo === 'credito' ? r.semanas : null,
+    interes_pct: r.tipo === 'credito' ? ({4:20,6:25,8:30,12:35}[r.semanas]||20) : 0,
+    tipo: r.tipo,
+    estatus: r.tipo === 'contado' ? 'completada' : r.tipo,
+    vendedor_id: currentUser?.id || null,
+    vendedor_nombre: currentUser?.user_metadata?.nombre || null,
+    comision: currentUserRol === 'vendedor' ? r.totalFinal * 0.10 : 0
+  };
+
+  const { data: ventaData, error: ventaError } = await db.from('bs_ventas').insert(ventaPayload).select().single();
   if (ventaError) { toast('Error al guardar venta', 'error'); return; }
 
-  // Insert detalle
   await db.from('bs_ventas_detalle').insert(cart.map(item => ({ venta_id: ventaData.id, perfume_id: item.id, cantidad: item.qty, precio_unitario: item.precio })));
 
-  // Descontar stock si es contado
-  if (tipo === 'contado') {
+  if (r.tipo === 'contado') {
     for (const item of cart) {
       const p = perfumes.find(x => x.id === item.id);
       if (p) await db.from('bs_perfumes').update({ stock: Math.max(0, p.stock - item.qty) }).eq('id', item.id);
     }
   }
-
-  // Crear apartado o credito
-  if (tipo === 'apartado') {
-    await db.from('bs_apartados').insert({ cliente_id: clienteId, perfume_id: cart[0].id, monto_total: total, anticipo: 0, saldo: total, estatus: 'activo' });
-  } else if (tipo === 'credito') {
-    await db.from('bs_creditos').insert({ cliente_id: clienteId, perfume_id: cart[0].id, monto_total: total, anticipo: 0, saldo: total, plazo_semanas: 4, estatus: 'activo' });
+  if (r.tipo === 'apartado') {
+    await db.from('bs_apartados').insert({ cliente_id: clienteId, perfume_id: cart[0].id, monto_total: r.subtotal, anticipo: 0, saldo: r.subtotal, estatus: 'activo' });
+  } else if (r.tipo === 'credito') {
+    await db.from('bs_creditos').insert({ cliente_id: clienteId, perfume_id: cart[0].id, monto_total: r.totalFinal, anticipo: r.anticipo, saldo: r.totalFinal - r.anticipo, plazo_semanas: r.semanas, estatus: 'activo' });
+  }
+  // Registrar comisión si es vendedor
+  if (currentUserRol === 'vendedor' && currentUser) {
+    await db.from('bs_comisiones').insert({ vendedor_id: currentUser.id, vendedor_nombre: currentUser.user_metadata?.nombre, venta_id: ventaData.id, total_venta: r.totalFinal, porcentaje: 10, comision: r.totalFinal * 0.10 });
   }
 
+  const cartCopy = [...cart];
   cart = [];
   await loadPerfumes();
   renderCart(); renderListaVenta(perfumes); updateDashStats(); updateBadges();
-  registrarLog('venta', 'ventas', `Venta ${tipo} — $${total.toFixed(2)} (${cart.map(x=>x.nombre).join(', ')})`, {tipo, total});
-  toast(`Venta (${tipo}) — $${total.toFixed(2)}`, 'success');
+  registrarLog('venta', 'ventas', `Venta ${r.tipo} — $${r.totalFinal.toFixed(2)}`, {tipo: r.tipo, total: r.totalFinal});
+  toast(`Venta (${r.tipo}) — $${r.totalFinal.toFixed(2)}`, 'success');
+  // Generar comprobante
+  generarComprobante(ventaData, cartCopy, r);
 }
 
 // ===================== HISTORIAL =====================
@@ -1705,10 +1802,11 @@ function iniciarApp() {
   document.getElementById('main-app').style.display = 'flex';
   const nombre = currentUser?.user_metadata?.nombre || currentUser?.email?.split('@')[0] || '—';
   document.getElementById('user-nombre').textContent = nombre;
-  // Mostrar Log solo a admin
+  // Mostrar Log solo a admin, mis-ventas solo a vendedor
   const navLog = document.getElementById('nav-log');
-  if (currentUserRol === 'admin') navLog.style.display = '';
-  else navLog.style.display = 'none';
+  const navMisVentas = document.getElementById('nav-mis-ventas');
+  if (currentUserRol === 'admin') { navLog.style.display = ''; if(navMisVentas) navMisVentas.style.display = 'none'; }
+  else { navLog.style.display = 'none'; if(navMisVentas) navMisVentas.style.display = ''; }
   // Aplicar restricciones de rol al DOM después de render
   applyRoleRestrictions();
   registrarLog('login', null, 'Acceso al sistema', {email: currentUser.email});
@@ -1738,6 +1836,93 @@ async function loadAll() {
   await Promise.all([loadMarcas(), loadPerfumes(), loadClientes(), loadVentas(), loadCategoriasElec()]);
   renderDashboard();
   updateBadges();
+}
+
+// ===================== MIS VENTAS =====================
+async function renderMisVentas() {
+  const tbody = document.getElementById('tabla-mis-ventas');
+  if (!tbody) return;
+  try {
+    const inicioMes = new Date(); inicioMes.setDate(1); inicioMes.setHours(0,0,0,0);
+    const { data } = await db.from('bs_ventas').select('*, bs_ventas_detalle(count)')
+      .eq('vendedor_id', currentUser.id)
+      .gte('fecha', inicioMes.toISOString())
+      .order('fecha', { ascending: false });
+    const list = data || [];
+    const totalVentas = list.reduce((s,v) => s + Number(v.total_final||v.total), 0);
+    const totalComision = totalVentas * 0.10;
+    document.getElementById('mv-total-ventas').textContent = '$' + totalVentas.toFixed(0);
+    document.getElementById('mv-total-comision').textContent = '$' + totalComision.toFixed(0);
+    document.getElementById('mv-num-ventas').textContent = list.length;
+    if (!list.length) { tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><span class="icon">💰</span><p>Sin ventas este mes</p></div></td></tr>'; return; }
+    tbody.innerHTML = list.map(v => `<tr>
+      <td style="font-size:.75rem">${new Date(v.fecha).toLocaleDateString('es-MX')}</td>
+      <td>${v.bs_ventas_detalle?.[0]?.count||'—'} prod.</td>
+      <td class="price">$${Number(v.total_final||v.total).toFixed(2)}</td>
+      <td><span class="badge badge-gold">${v.tipo}</span></td>
+      <td style="color:#4CAF7C;font-weight:600">$${(Number(v.total_final||v.total)*0.10).toFixed(2)}</td>
+    </tr>`).join('');
+  } catch(e) { tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><p>Error cargando</p></div></td></tr>'; }
+}
+
+// ===================== COMPROBANTE PDF =====================
+function generarComprobante(venta, items, r) {
+  const cl = clientes.find(c => c.id == venta.cliente_id);
+  const fecha = new Date().toLocaleString('es-MX', {dateStyle:'long', timeStyle:'short'});
+  const tipoLabel = {contado:'Contado', apartado:'Apartado', credito:'Crédito'};
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <style>
+    body{font-family:'Georgia',serif;max-width:400px;margin:0 auto;padding:24px;color:#1a1000;background:#fff;}
+    .logo{text-align:center;font-size:1.8rem;letter-spacing:3px;color:#8B6914;margin-bottom:4px;}
+    .sub{text-align:center;font-size:.65rem;letter-spacing:4px;text-transform:uppercase;color:#aaa;margin-bottom:20px;}
+    hr{border:none;border-top:1px solid #ddd;margin:12px 0;}
+    .row{display:flex;justify-content:space-between;padding:4px 0;font-size:.85rem;}
+    .row.bold{font-weight:bold;}
+    .row.big{font-size:1.1rem;color:#8B6914;}
+    .item{padding:6px 0;border-bottom:1px dashed #eee;font-size:.82rem;}
+    .item-name{font-weight:600;}
+    .item-sub{color:#888;font-size:.75rem;}
+    .footer{text-align:center;margin-top:20px;font-size:.7rem;color:#aaa;}
+    .badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.7rem;background:#f5ead0;color:#8B6914;border:1px solid #ddd;}
+    .aviso{background:#fffbe6;border:1px solid #f0d060;border-radius:8px;padding:10px;font-size:.78rem;margin-top:12px;}
+    @media print{body{padding:0;}}
+  </style></head><body>
+  <div class="logo">Bella Select</div>
+  <div class="sub">Comprobante de Venta</div>
+  <hr>
+  <div class="row"><span>Folio</span><span>#${String(venta.id).slice(-6).toUpperCase()}</span></div>
+  <div class="row"><span>Fecha</span><span>${fecha}</span></div>
+  <div class="row"><span>Tipo</span><span><span class="badge">${tipoLabel[r.tipo]}</span></span></div>
+  ${cl ? `<div class="row"><span>Cliente</span><span>${cl.nombre}</span></div>` : ''}
+  <hr>
+  ${items.map(item => `
+    <div class="item">
+      <div class="item-name">${item.nombre}</div>
+      <div class="item-sub">Cant: ${item.qty} × $${item.precio.toFixed(2)}</div>
+      <div style="text-align:right;color:#8B6914;">$${(item.precio*item.qty).toFixed(2)}</div>
+    </div>`).join('')}
+  <hr>
+  <div class="row"><span>Subtotal</span><span>$${r.subtotal.toFixed(2)}</span></div>
+  ${r.descuento > 0 ? `<div class="row" style="color:green"><span>Descuento 5%</span><span>-$${r.descuento.toFixed(2)}</span></div>` : ''}
+  ${r.tipo === 'credito' ? `
+    <div class="row"><span>Anticipo (10%)</span><span>$${r.anticipo.toFixed(2)}</span></div>
+    <div class="row"><span>Interés (${r.semanas} semanas)</span><span>+$${r.interes.toFixed(2)}</span></div>
+  ` : ''}
+  <div class="row big bold"><span>TOTAL</span><span>$${r.totalFinal.toFixed(2)}</span></div>
+  ${r.tipo === 'credito' ? `
+    <div class="aviso">💳 Crédito a <strong>${r.semanas} semanas</strong><br>
+    Anticipo pagado: <strong>$${r.anticipo.toFixed(2)}</strong><br>
+    Saldo pendiente: <strong>$${(r.totalFinal - r.anticipo).toFixed(2)}</strong></div>` : ''}
+  ${r.tipo === 'apartado' ? `
+    <div class="aviso">📦 Producto apartado<br>Saldo a pagar: <strong>$${r.totalFinal.toFixed(2)}</strong></div>` : ''}
+  <hr>
+  <div class="footer">Bella Select • Gracias por su compra<br>${new Date().getFullYear()}</div>
+  </body></html>`;
+
+  const win = window.open('', '_blank', 'width=480,height=700');
+  win.document.write(html);
+  win.document.close();
+  setTimeout(() => win.print(), 500);
 }
 
 // ===================== LOG =====================
