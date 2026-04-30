@@ -212,11 +212,16 @@
 <!-- LOGIN -->
 <div class="login-screen" id="login-screen">
   <div class="login-box">
+    <input type="hidden" id="login-email-hidden" value="">
     <div class="login-logo">Bella Select</div>
     <div class="login-sub">Sistema de Gestión</div>
     <div class="form-group">
       <label>Usuario</label>
-      <input type="email" id="login-email" placeholder="correo@bellaselect.com" onkeydown="if(event.key==='Enter')doLogin()">
+      <select id="login-user-select" onchange="seleccionarUsuario(this.value)" style="margin-bottom:0">
+        <option value="">— Selecciona tu usuario —</option>
+        <option value="admin@bellaselect.com">Admin</option>
+        <option value="angelica@bellaselect.com">Angélica</option>
+      </select>
     </div>
     <div class="form-group">
       <label>Contraseña</label>
@@ -1662,8 +1667,13 @@ function buscarElecBarcode() {
 let currentUser = null;
 let currentUserRol = 'vendedor';
 
+function seleccionarUsuario(email) {
+  document.getElementById('login-email-hidden').value = email;
+  document.getElementById('login-error').textContent = '';
+}
+
 async function doLogin() {
-  const email = document.getElementById('login-email').value.trim();
+  const email = document.getElementById('login-email-hidden').value || document.getElementById('login-user-select').value;
   const pass = document.getElementById('login-pass').value;
   const errEl = document.getElementById('login-error');
   const btn = document.getElementById('login-btn');
