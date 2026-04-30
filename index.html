@@ -1776,42 +1776,5 @@ function filtrarLog(f, btn) {
   // else login screen is shown by default
 })();
 </script>
-const _origNavigate = navigate;
-const extraPages = {
-  'elec-catalogo': async () => { await renderElecCatalogo(); },
-  'elec-venta': async () => { await renderElecVentaPage(); }
-};
-Object.assign(pageTitles, { 'elec-catalogo': 'Electrónicos', 'elec-venta': 'Venta Electrónico' });
-
-// Patch openModal for electronics
-const _origOpenModal = openModal;
-function openModal(id) {
-  document.getElementById(id).classList.add('open');
-  if (id === 'modal-perfume') populateMarcaSelect();
-  if (id === 'modal-apartado') { populateSelect('ap-cliente', clientes, 'nombre'); populateSelect('ap-perfume', perfumes, 'nombre'); }
-  if (id === 'modal-credito') { populateSelect('cr-cliente', clientes, 'nombre'); populateSelect('cr-perfume', perfumes, 'nombre'); }
-  if (id === 'modal-elec') { loadCategoriasElec().then(populateElecCategoriaSelect); }
-}
-
-// Extend navigate
-function navigate(page, el) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  const pageEl = document.getElementById('page-' + page);
-  if (pageEl) pageEl.classList.add('active');
-  if (el) el.classList.add('active');
-  document.getElementById('pageTitle').textContent = pageTitles[page] || page;
-  closeSidebar();
-  const fns = {
-    dashboard: renderDashboard, inventario: renderInventario, marcas: renderMarcas,
-    ventas: renderVentaPage, historial: renderHistorial, clientes: renderClientes,
-    apartados: renderApartados, creditos: renderCreditos,
-    'elec-catalogo': renderElecCatalogo, 'elec-venta': renderElecVentaPage,
-    'log': renderLog
-  };
-  Object.assign(pageTitles, { log: 'Log Admin' });
-  if (fns[page]) { await fns[page](); setTimeout(applyRoleRestrictions, 100); }
-}
-</script>
 </body>
 </html>
