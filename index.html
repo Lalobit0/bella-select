@@ -16,9 +16,10 @@
     --sidebar-w:240px;
   }
   [data-theme="light"] {
-    --black:#F5F0E8;--dark:#EDE5D4;--dark2:#E4D9C4;--dark3:#D9CCAF;--dark4:#CCBC98;
-    --text:#1A1000;--text-dim:#5A4010;--text-muted:#8A7040;
-    --border:rgba(139,105,20,0.2);--border-bright:rgba(139,105,20,0.5);
+    --black:#2A2520;--dark:#322C26;--dark2:#3B342C;--dark3:#453D34;--dark4:#4F463C;
+    --text:#F0E6CC;--text-dim:#C8B898;--text-muted:#8A7A5A;
+    --border:rgba(201,168,76,0.2);--border-bright:rgba(201,168,76,0.45);
+    --gold:#D4AE5C;--gold-light:#EAD080;
   }
   *{margin:0;padding:0;box-sizing:border-box;}
   body{font-family:'Montserrat',sans-serif;background:var(--black);color:var(--text);min-height:100vh;overflow-x:hidden;}
@@ -246,6 +247,7 @@
       <div class="nav-item" onclick="navigate('clientes',this)"><span class="nav-icon">⬡</span> Clientes</div>
       <div class="nav-item" onclick="navigate('apartados',this)"><span class="nav-icon">◑</span> Apartados <span class="nav-badge" id="badge-apartados" style="display:none"></span></div>
       <div class="nav-item" onclick="navigate('creditos',this)"><span class="nav-icon">◐</span> Créditos <span class="nav-badge" id="badge-creditos" style="display:none"></span></div>
+      <div class="nav-item" id="nav-log" style="display:none" onclick="navigate('log',this)"><span class="nav-icon">📋</span> Log Admin</div>
       <div class="nav-section">Electrónicos</div>
       <div class="nav-item" onclick="navigate('elec-catalogo',this)"><span class="nav-icon">📺</span> Catálogo</div>
       <div class="nav-item" onclick="navigate('elec-venta',this)"><span class="nav-icon">🛒</span> Venta Electrónico</div>
@@ -421,6 +423,27 @@
           <button class="tab" onclick="tabFilter('creditos','liquidado',this)">Liquidados</button>
         </div>
         <div id="lista-creditos"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
+      </div>
+
+      <!-- LOG ADMIN -->
+      <div class="page" id="page-log">
+        <div class="section-header">
+          <div><div class="gold-line"></div><div class="section-title">Log de Movimientos</div></div>
+          <button class="btn btn-outline btn-sm" onclick="renderLog()">↻ Actualizar</button>
+        </div>
+        <div class="filters" style="margin-bottom:16px">
+          <button class="filter-btn active" onclick="filtrarLog('all',this)">Todos</button>
+          <button class="filter-btn" onclick="filtrarLog('venta',this)">Ventas</button>
+          <button class="filter-btn" onclick="filtrarLog('crear',this)">Creaciones</button>
+          <button class="filter-btn" onclick="filtrarLog('editar',this)">Ediciones</button>
+          <button class="filter-btn" onclick="filtrarLog('eliminar',this)">Eliminaciones</button>
+          <button class="filter-btn" onclick="filtrarLog('pago',this)">Pagos</button>
+          <button class="filter-btn" onclick="filtrarLog('login',this)">Accesos</button>
+        </div>
+        <div class="table-card">
+          <table><thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Módulo</th><th>Descripción</th></tr></thead>
+          <tbody id="tabla-log"><tr><td colspan="5"><div class="loading"><div class="spinner"></div>Cargando...</div></td></tr></tbody></table>
+        </div>
       </div>
 
       <!-- ELECTRÓNICOS CATÁLOGO -->
@@ -858,7 +881,9 @@ async function eliminarPerfume(id) {
   if (!confirm('¿Eliminar este perfume?')) return;
   const { error } = await db.from('bs_perfumes').delete().eq('id', id);
   if (error) { toast('Error: ' + error.message, 'error'); return; }
+  const pElim = perfumes.find(p=>p.id===id);
   toast('Perfume eliminado', '');
+  registrarLog('eliminar', 'perfumes', `Eliminó perfume: ${pElim?.nombre||id}`, {id});
   await loadPerfumes(); renderInventario(); updateDashStats();
 }
 
@@ -1068,6 +1093,7 @@ async function finalizarVenta() {
   cart = [];
   await loadPerfumes();
   renderCart(); renderListaVenta(perfumes); updateDashStats(); updateBadges();
+  registrarLog('venta', 'ventas', `Venta ${tipo} — $${total.toFixed(2)} (${cart.map(x=>x.nombre).join(', ')})`, {tipo, total});
   toast(`Venta (${tipo}) — $${total.toFixed(2)}`, 'success');
 }
 
@@ -1101,6 +1127,7 @@ async function guardarCliente() {
   const { error } = await db.from('bs_clientes').insert({ nombre, telefono: document.getElementById('cl-tel').value, correo: document.getElementById('cl-correo').value, direccion: document.getElementById('cl-dir').value, notas: document.getElementById('cl-notas').value });
   if (error) { toast('Error: ' + error.message, 'error'); return; }
   toast('Cliente registrado', 'success');
+  registrarLog('crear', 'clientes', `Nuevo cliente: ${nombre}`, {nombre});
   closeModal('modal-cliente');
   ['cl-nombre','cl-tel','cl-correo','cl-dir','cl-notas'].forEach(id => document.getElementById(id).value = '');
   await loadClientes(); renderClientes(); updateDashStats();
@@ -1263,6 +1290,7 @@ async function procesarPago() {
   await db.from(table).update({ saldo: nuevoSaldo, estatus: nuevoEstatus }).eq('id', id);
   await db.from('bs_pagos').insert({ tipo_ref: tipo, ref_id: id, monto, metodo: document.getElementById('pg-metodo').value, notas: document.getElementById('pg-notas').value });
   toast(`Pago de $${monto.toFixed(2)} registrado`, 'success');
+  registrarLog('pago', tipo, `Abono $${monto.toFixed(2)} a ${tipo} #${id}`, {tipo, id, monto});
   closeModal('modal-pago');
   currentPagoTarget = null;
   if (tipo === 'apartado') renderApartados(); else renderCreditos();
@@ -1596,6 +1624,7 @@ async function finalizarElecVenta() {
   } else if (tipo === 'credito') {
     await db.from('bs_creditos').insert({ cliente_id: clienteId, perfume_id: null, monto_total: total, anticipo: 0, saldo: total, plazo_semanas: 4, estatus: 'activo', notas: 'Electrónico: ' + elecCart.map(x=>x.nombre).join(', ') });
   }
+  registrarLog('venta', 'electronicos', `Venta electrónico ${tipo} — $${total.toFixed(2)} (${elecCart.map(x=>x.nombre).join(', ')})`, {tipo, total});
   elecCart = [];
   await loadElectronicos();
   renderElecCart(); renderElecListaVenta(electronicos); updateDashStats(); updateBadges();
@@ -1654,12 +1683,25 @@ function iniciarApp() {
   document.getElementById('main-app').style.display = 'flex';
   const nombre = currentUser?.user_metadata?.nombre || currentUser?.email?.split('@')[0] || '—';
   document.getElementById('user-nombre').textContent = nombre;
-  // Ocultar opciones admin si es vendedor
-  if (currentUserRol !== 'admin') {
-    // Vendedor solo ve ventas y clientes, no puede eliminar
-  }
+  // Mostrar Log solo a admin
+  const navLog = document.getElementById('nav-log');
+  if (currentUserRol === 'admin') navLog.style.display = '';
+  else navLog.style.display = 'none';
+  // Aplicar restricciones de rol al DOM después de render
+  applyRoleRestrictions();
+  registrarLog('login', null, 'Acceso al sistema', {email: currentUser.email});
   loadAll();
 }
+
+function applyRoleRestrictions() {
+  // Se llama después de cada render también
+  if (currentUserRol !== 'admin') {
+    document.querySelectorAll('.btn-danger').forEach(btn => btn.style.display = 'none');
+  }
+}
+
+// Patch: apply restrictions after every navigate
+const _fnsWithRestrictions = ['renderInventario','renderMarcas','renderClientes','renderApartados','renderCreditos','renderElecCatalogo'];
 
 async function cerrarSesion() {
   if (!confirm('¿Cerrar sesión?')) return;
@@ -1674,6 +1716,42 @@ async function loadAll() {
   await Promise.all([loadMarcas(), loadPerfumes(), loadClientes(), loadVentas(), loadCategoriasElec()]);
   renderDashboard();
   updateBadges();
+}
+
+// ===================== LOG =====================
+async function registrarLog(accion, tabla, descripcion, datos={}) {
+  if (!currentUser) return;
+  await db.from('bs_log').insert({
+    usuario_id: currentUser.id,
+    usuario_nombre: currentUser.user_metadata?.nombre || currentUser.email,
+    accion, tabla, descripcion,
+    datos: datos || {}
+  });
+}
+
+let filtroLog = 'all';
+async function renderLog() {
+  const tbody = document.getElementById('tabla-log');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="5"><div class="loading"><div class="spinner"></div>Cargando...</div></td></tr>';
+  let query = db.from('bs_log').select('*').order('fecha', { ascending: false }).limit(200);
+  if (filtroLog !== 'all') query = query.eq('accion', filtroLog);
+  const { data } = await query;
+  if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><span class="icon">📋</span><p>Sin registros</p></div></td></tr>'; return; }
+  const accionBadge = { crear:'badge-green', editar:'badge-yellow', eliminar:'badge-red', venta:'badge-gold', pago:'badge-green', login:'badge-gold' };
+  tbody.innerHTML = data.map(r => `<tr>
+    <td style="font-size:.72rem;white-space:nowrap">${new Date(r.fecha).toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'})}</td>
+    <td><strong>${r.usuario_nombre||'—'}</strong></td>
+    <td><span class="badge ${accionBadge[r.accion]||'badge-gold'}">${r.accion}</span></td>
+    <td style="color:var(--text-muted);font-size:.75rem">${r.tabla||'—'}</td>
+    <td style="font-size:.78rem">${r.descripcion||'—'}</td>
+  </tr>`).join('');
+}
+function filtrarLog(f, btn) {
+  filtroLog = f;
+  document.querySelectorAll('#page-log .filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderLog();
 }
 
 // ===================== INIT =====================
@@ -1718,9 +1796,11 @@ function navigate(page, el) {
     dashboard: renderDashboard, inventario: renderInventario, marcas: renderMarcas,
     ventas: renderVentaPage, historial: renderHistorial, clientes: renderClientes,
     apartados: renderApartados, creditos: renderCreditos,
-    'elec-catalogo': renderElecCatalogo, 'elec-venta': renderElecVentaPage
+    'elec-catalogo': renderElecCatalogo, 'elec-venta': renderElecVentaPage,
+    'log': renderLog
   };
-  if (fns[page]) fns[page]();
+  Object.assign(pageTitles, { log: 'Log Admin' });
+  if (fns[page]) { await fns[page](); setTimeout(applyRoleRestrictions, 100); }
 }
 </script>
 </body>
