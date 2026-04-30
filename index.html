@@ -217,11 +217,7 @@
     <div class="login-sub">Sistema de Gestión</div>
     <div class="form-group">
       <label>Usuario</label>
-      <select id="login-user-select" onchange="seleccionarUsuario(this.value)" style="margin-bottom:0">
-        <option value="">— Selecciona tu usuario —</option>
-        <option value="admin@bellaselect.com">Admin</option>
-        <option value="angelica@bellaselect.com">Angélica</option>
-      </select>
+      <input type="text" id="login-usuario" placeholder="Tu nombre de usuario" onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()">
     </div>
     <div class="form-group">
       <label>Contraseña</label>
@@ -1667,17 +1663,21 @@ function buscarElecBarcode() {
 let currentUser = null;
 let currentUserRol = 'vendedor';
 
-function seleccionarUsuario(email) {
-  document.getElementById('login-email-hidden').value = email;
-  document.getElementById('login-error').textContent = '';
-}
-
 async function doLogin() {
-  const email = document.getElementById('login-email-hidden').value || document.getElementById('login-user-select').value;
+  const usuarioInput = document.getElementById('login-usuario').value.trim().toLowerCase();
+  // Mapa interno — no se muestra al usuario
+  const usuarioMap = {
+    'admin': 'admin@bellaselect.com',
+    'angelica': 'angelica@bellaselect.com',
+    'angélica': 'angelica@bellaselect.com',
+    'angelica ': 'angelica@bellaselect.com'
+  };
+  const email = usuarioMap[usuarioInput];
+  if (!email) { errEl.textContent = 'Usuario no reconocido'; btn.disabled=false; btn.textContent='Entrar'; return; }
   const pass = document.getElementById('login-pass').value;
   const errEl = document.getElementById('login-error');
   const btn = document.getElementById('login-btn');
-  if (!email || !pass) { errEl.textContent = 'Ingresa usuario y contraseña'; return; }
+  if (!usuarioInput || !pass) { errEl.textContent = 'Ingresa usuario y contraseña'; return; }
   btn.disabled = true; btn.textContent = 'Entrando...';
   errEl.textContent = '';
   const { data, error } = await db.auth.signInWithPassword({ email, password: pass });
