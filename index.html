@@ -216,6 +216,9 @@
       <div class="nav-item" onclick="navigate('clientes',this)"><span class="nav-icon">⬡</span> Clientes</div>
       <div class="nav-item" onclick="navigate('apartados',this)"><span class="nav-icon">◑</span> Apartados <span class="nav-badge" id="badge-apartados" style="display:none"></span></div>
       <div class="nav-item" onclick="navigate('creditos',this)"><span class="nav-icon">◐</span> Créditos <span class="nav-badge" id="badge-creditos" style="display:none"></span></div>
+      <div class="nav-section">Electrónicos</div>
+      <div class="nav-item" onclick="navigate('elec-catalogo',this)"><span class="nav-icon">📺</span> Catálogo</div>
+      <div class="nav-item" onclick="navigate('elec-venta',this)"><span class="nav-icon">🛒</span> Venta Electrónico</div>
     </div>
     <div class="sidebar-footer">
       <span style="font-size:.65rem;color:var(--text-muted)" id="sync-status">● En línea</span>
@@ -388,6 +391,58 @@
         <div id="lista-creditos"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
       </div>
 
+      <!-- ELECTRÓNICOS CATÁLOGO -->
+      <div class="page" id="page-elec-catalogo">
+        <div class="section-header">
+          <div><div class="gold-line"></div><div class="section-title">Electrónicos</div></div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-outline" onclick="setElecView('list')">≡ Lista</button>
+            <button class="btn btn-outline" onclick="setElecView('grid')">⊞ Grid</button>
+            <button class="btn btn-gold" onclick="openModal('modal-elec')">+ Producto</button>
+          </div>
+        </div>
+        <div class="filters" id="elec-cat-filters"></div>
+        <div id="elec-catalogo-content"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
+      </div>
+
+      <!-- ELECTRÓNICOS VENTA -->
+      <div class="page" id="page-elec-venta">
+        <div class="section-header"><div><div class="gold-line"></div><div class="section-title">Venta — Electrónico</div></div></div>
+        <div class="venta-layout">
+          <div>
+            <div class="scan-area">
+              <div style="margin-bottom:10px;color:var(--text-dim);font-size:.8rem"><strong style="color:var(--gold)">📷 Escanear código</strong></div>
+              <video id="elec-scanner-video" playsinline style="display:none;width:100%;max-width:300px;border-radius:8px"></video>
+              <div id="elec-scanner-status" style="font-size:.75rem;color:var(--text-muted);margin:6px 0"></div>
+              <button class="btn btn-outline btn-sm" onclick="toggleElecScanner()">📷 Abrir cámara</button>
+              <span style="color:var(--text-muted);font-size:.7rem;margin:0 8px">ó</span>
+              <input type="text" id="elec-barcode-input" placeholder="Código manual" style="width:150px;display:inline-block" onkeydown="if(event.key==='Enter')buscarElecBarcode()">
+            </div>
+            <div class="table-card">
+              <div class="table-header">
+                <div class="table-title">Seleccionar Producto</div>
+                <div class="search-box"><span>🔍</span><input type="text" placeholder="Buscar..." oninput="filtrarElecVenta(this.value)"></div>
+              </div>
+              <div id="elec-lista-venta" style="max-height:360px;overflow-y:auto"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
+            </div>
+          </div>
+          <div class="cart">
+            <div class="cart-header"><div class="cart-title">🛒 Venta Electrónico</div></div>
+            <div class="cart-items" id="elec-cart-items"><div class="cart-empty">Sin productos</div></div>
+            <div class="cart-footer">
+              <div class="cart-total"><span class="cart-total-label">Total</span><span class="cart-total-value" id="elec-cart-total">$0.00</span></div>
+              <div class="form-group" style="margin-bottom:10px"><label>Tipo de pago</label>
+                <select id="elec-tipo-pago"><option value="contado">Contado</option><option value="apartado">Apartado</option><option value="credito">Crédito</option></select>
+              </div>
+              <div class="form-group" style="margin-bottom:10px"><label>Cliente</label>
+                <select id="elec-venta-cliente"><option value="">Sin cliente</option></select>
+              </div>
+              <button class="btn btn-gold" style="width:100%" onclick="finalizarElecVenta()">Finalizar Venta</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -532,6 +587,41 @@
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-pago')">Cancelar</button>
       <button class="btn btn-gold" onclick="procesarPago()">Registrar Pago</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ELECTRÓNICO -->
+<div class="modal-overlay" id="modal-elec">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title" id="modal-elec-title">Nuevo Electrónico</div><button class="modal-close" onclick="closeModal('modal-elec')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group" style="margin-bottom:14px">
+        <label>Foto del Producto</label>
+        <div class="photo-area" onclick="document.getElementById('elec-foto-input').click()">
+          <img id="elec-foto-preview" class="photo-preview">
+          <div class="photo-placeholder" id="elec-foto-placeholder"><span class="icon">📷</span>Toca para tomar foto o elegir imagen</div>
+        </div>
+        <input type="file" id="elec-foto-input" accept="image/*" capture="environment" style="display:none" onchange="handleElecPhoto(this)">
+      </div>
+      <div class="form-grid">
+        <div class="form-group full"><label>Nombre / Descripción *</label><input type="text" id="el-nombre" placeholder="ej. Roku Express 4K"></div>
+        <div class="form-group"><label>Marca *</label><input type="text" id="el-marca" placeholder="ej. Roku, Amazon, Apple"></div>
+        <div class="form-group"><label>Modelo</label><input type="text" id="el-modelo" placeholder="ej. Express 4K+"></div>
+        <div class="form-group"><label>Capacidad / Especificación</label><input type="text" id="el-capacidad" placeholder="ej. 64GB, 4K, WiFi 6"></div>
+        <div class="form-group"><label>Categoría</label><select id="el-categoria"></select></div>
+        <div class="form-group"><label>Código de Barras</label><input type="text" id="el-barcode" placeholder="Código..."></div>
+        <div class="form-group"><label>Precio Costo</label><input type="number" id="el-costo" placeholder="0.00" step="0.01"></div>
+        <div class="form-group"><label>Precio Venta *</label><input type="number" id="el-precio" placeholder="0.00" step="0.01"></div>
+        <div class="form-group"><label>Stock *</label><input type="number" id="el-stock" placeholder="0"></div>
+        <div class="form-group"><label>Stock Mínimo</label><input type="number" id="el-stock-min" placeholder="1"></div>
+        <div class="form-group"><label>Número de Serie</label><input type="text" id="el-serie" placeholder="SN..."></div>
+        <div class="form-group full"><label>Notas</label><textarea id="el-notas" placeholder="Condición, accesorios incluidos, notas..."></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-elec')">Cancelar</button>
+      <button class="btn btn-gold" id="btn-guardar-elec" onclick="guardarElec()">Guardar</button>
     </div>
   </div>
 </div>
@@ -1204,12 +1294,351 @@ function toast(msg, type='') {
   wrap.appendChild(t); setTimeout(() => t.remove(), 3000);
 }
 
+// ===================== ELECTRÓNICOS =====================
+let electronicos = [];
+let categoriasElec = [];
+let elecCart = [];
+let currentElecView = 'list';
+let editingElecId = null;
+let elecFotoDataUrl = null;
+let elecScannerStream = null;
+
+async function loadElectronicos() {
+  const { data } = await db.from('bs_electronicos').select('*').eq('activo', true).order('nombre');
+  electronicos = data || [];
+}
+async function loadCategoriasElec() {
+  const { data } = await db.from('bs_categorias_elec').select('*').order('nombre');
+  categoriasElec = data || [];
+}
+
+function handleElecPhoto(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const MAX = 400; let w = img.width, h = img.height;
+      if (w > h) { if (w > MAX) { h = h*(MAX/w); w = MAX; } } else { if (h > MAX) { w = w*(MAX/h); h = MAX; } }
+      canvas.width = Math.round(w); canvas.height = Math.round(h);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      elecFotoDataUrl = canvas.toDataURL('image/jpeg', 0.45);
+      const prev = document.getElementById('elec-foto-preview');
+      prev.src = elecFotoDataUrl; prev.style.display = 'block';
+      document.getElementById('elec-foto-placeholder').style.display = 'none';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function guardarElec() {
+  const nombre = document.getElementById('el-nombre').value.trim();
+  const precio = parseFloat(document.getElementById('el-precio').value) || 0;
+  const stock = parseInt(document.getElementById('el-stock').value) || 0;
+  if (!nombre || !precio) { toast('Nombre y precio son requeridos', 'error'); return; }
+  const btn = document.getElementById('btn-guardar-elec');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  const payload = {
+    nombre, marca: document.getElementById('el-marca').value,
+    modelo: document.getElementById('el-modelo').value,
+    capacidad: document.getElementById('el-capacidad').value,
+    categoria_id: document.getElementById('el-categoria').value || null,
+    precio_costo: parseFloat(document.getElementById('el-costo').value) || 0,
+    precio_venta: precio, stock,
+    stock_minimo: parseInt(document.getElementById('el-stock-min').value) || 1,
+    numero_serie: document.getElementById('el-serie').value,
+    barcode: document.getElementById('el-barcode').value,
+    notas: document.getElementById('el-notas').value,
+    foto_url: elecFotoDataUrl || (editingElecId ? electronicos.find(e=>e.id===editingElecId)?.foto_url : null)
+  };
+  let error;
+  if (editingElecId) {
+    ({ error } = await db.from('bs_electronicos').update(payload).eq('id', editingElecId));
+  } else {
+    ({ error } = await db.from('bs_electronicos').insert(payload));
+  }
+  btn.disabled = false; btn.textContent = 'Guardar';
+  if (error) { toast('Error: ' + error.message, 'error'); return; }
+  toast(editingElecId ? 'Producto actualizado' : 'Producto agregado', 'success');
+  closeModal('modal-elec'); clearElecForm();
+  await loadElectronicos(); renderElecCatalogo();
+}
+
+function clearElecForm() {
+  ['el-nombre','el-marca','el-modelo','el-capacidad','el-barcode','el-costo','el-precio','el-stock','el-stock-min','el-serie','el-notas'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  const prev = document.getElementById('elec-foto-preview'); prev.style.display='none'; prev.src='';
+  document.getElementById('elec-foto-placeholder').style.display='';
+  elecFotoDataUrl = null; editingElecId = null;
+  document.getElementById('modal-elec-title').textContent = 'Nuevo Electrónico';
+}
+
+async function editarElec(id) {
+  const e = electronicos.find(x => x.id === id); if (!e) return;
+  editingElecId = id;
+  await loadCategoriasElec();
+  populateElecCategoriaSelect();
+  document.getElementById('modal-elec-title').textContent = 'Editar Producto';
+  document.getElementById('el-nombre').value = e.nombre || '';
+  document.getElementById('el-marca').value = e.marca || '';
+  document.getElementById('el-modelo').value = e.modelo || '';
+  document.getElementById('el-capacidad').value = e.capacidad || '';
+  document.getElementById('el-costo').value = e.precio_costo || '';
+  document.getElementById('el-precio').value = e.precio_venta || '';
+  document.getElementById('el-stock').value = e.stock || '';
+  document.getElementById('el-stock-min').value = e.stock_minimo || 1;
+  document.getElementById('el-serie').value = e.numero_serie || '';
+  document.getElementById('el-barcode').value = e.barcode || '';
+  document.getElementById('el-notas').value = e.notas || '';
+  document.getElementById('el-categoria').value = e.categoria_id || '';
+  if (e.foto_url) {
+    const prev = document.getElementById('elec-foto-preview');
+    prev.src = e.foto_url; prev.style.display = 'block';
+    document.getElementById('elec-foto-placeholder').style.display = 'none';
+  }
+  openModal('modal-elec');
+}
+
+async function eliminarElec(id) {
+  if (!confirm('¿Eliminar este producto?')) return;
+  await db.from('bs_electronicos').update({ activo: false }).eq('id', id);
+  toast('Producto eliminado', '');
+  await loadElectronicos(); renderElecCatalogo();
+}
+
+function populateElecCategoriaSelect() {
+  const sel = document.getElementById('el-categoria');
+  sel.innerHTML = '<option value="">Sin categoría</option>';
+  categoriasElec.forEach(c => sel.innerHTML += `<option value="${c.id}">${c.icono} ${c.nombre}</option>`);
+}
+
+function getCategoriaNombre(id) {
+  const c = categoriasElec.find(x => x.id == id);
+  return c ? c.icono + ' ' + c.nombre : '—';
+}
+
+async function renderElecCatalogo() {
+  await Promise.all([loadElectronicos(), loadCategoriasElec()]);
+  const cont = document.getElementById('elec-catalogo-content');
+  // category filters
+  const filters = document.getElementById('elec-cat-filters');
+  filters.innerHTML = '';
+  const usedCats = [...new Set(electronicos.map(e => e.categoria_id).filter(Boolean))];
+  if (usedCats.length) {
+    const allBtn = document.createElement('button'); allBtn.className = 'filter-btn active'; allBtn.textContent = 'Todos';
+    allBtn.onclick = () => renderElecContent(cont, electronicos); filters.appendChild(allBtn);
+    usedCats.forEach(cid => {
+      const cat = categoriasElec.find(x => x.id == cid); if (!cat) return;
+      const btn = document.createElement('button'); btn.className = 'filter-btn';
+      btn.textContent = cat.icono + ' ' + cat.nombre;
+      btn.onclick = () => renderElecContent(cont, electronicos.filter(e => e.categoria_id == cid));
+      filters.appendChild(btn);
+    });
+  }
+  renderElecContent(cont, electronicos);
+}
+
+function renderElecContent(cont, list) {
+  if (!list.length) { cont.innerHTML = '<div class="empty-state"><span class="icon">📺</span><p>Sin productos electrónicos</p></div>'; return; }
+  if (currentElecView === 'grid') {
+    cont.innerHTML = `<div class="products-grid">${list.map(e => `
+      <div class="product-card" onclick="editarElec(${e.id})">
+        <div class="product-card-img">${e.foto_url ? `<img src="${e.foto_url}">` : '📺'}</div>
+        <div class="product-card-body">
+          <div class="product-card-name">${e.nombre}</div>
+          <div class="product-card-brand">${e.marca||''} ${e.modelo||''} ${e.capacidad||''}</div>
+          <div class="product-card-footer">
+            <span class="price">$${Number(e.precio_venta).toFixed(2)}</span>
+            <span class="${e.stock<=(e.stock_minimo||1)?'badge badge-red':''}">📦 ${e.stock}</span>
+          </div>
+        </div>
+      </div>`).join('')}</div>`;
+  } else {
+    cont.innerHTML = `<div class="table-card">
+      <div class="table-header"><div class="table-title">Inventario Electrónicos</div>
+        <div class="search-box"><span>🔍</span><input type="text" placeholder="Buscar..." oninput="buscarElec(this.value)"></div>
+      </div>
+      <table><thead><tr><th>Producto</th><th>Marca / Modelo</th><th>Categoría</th><th>Stock</th><th>Precio</th><th>Acciones</th></tr></thead>
+      <tbody id="tbody-elec">${renderElecRows(list)}</tbody></table></div>`;
+  }
+}
+
+function renderElecRows(list) {
+  if (!list.length) return '<tr><td colspan="6"><div class="empty-state"><span class="icon">📺</span><p>Sin resultados</p></div></td></tr>';
+  return list.map(e => `<tr>
+    <td><div class="product-cell">
+      <div class="product-thumb">${e.foto_url ? `<img src="${e.foto_url}">` : '📺'}</div>
+      <div><div class="product-name">${e.nombre}</div><div class="product-brand">${e.capacidad||''}</div></div>
+    </div></td>
+    <td>${e.marca||'—'} ${e.modelo ? '· '+e.modelo : ''}</td>
+    <td>${getCategoriaNombre(e.categoria_id)}</td>
+    <td><span class="${e.stock<=(e.stock_minimo||1)?'badge badge-red':'badge badge-green'}">${e.stock}</span></td>
+    <td class="price">$${Number(e.precio_venta).toFixed(2)}</td>
+    <td><div style="display:flex;gap:6px">
+      <button class="btn btn-outline btn-sm" onclick="editarElec(${e.id})">✎</button>
+      <button class="btn btn-danger btn-sm" onclick="eliminarElec(${e.id})">✕</button>
+    </div></td>
+  </tr>`).join('');
+}
+
+function buscarElec(q) {
+  const rows = document.getElementById('tbody-elec'); if (!rows) return;
+  const list = electronicos.filter(e => e.nombre.toLowerCase().includes(q.toLowerCase()) || (e.marca||'').toLowerCase().includes(q.toLowerCase()));
+  rows.innerHTML = renderElecRows(list);
+}
+function setElecView(v) { currentElecView = v; renderElecCatalogo(); }
+
+// VENTA ELECTRÓNICOS
+async function renderElecVentaPage() {
+  await Promise.all([loadElectronicos(), loadClientes()]);
+  renderElecListaVenta(electronicos);
+  const sel = document.getElementById('elec-venta-cliente');
+  sel.innerHTML = '<option value="">Sin cliente</option>';
+  clientes.forEach(c => sel.innerHTML += `<option value="${c.id}">${c.nombre}</option>`);
+  renderElecCart();
+}
+function renderElecListaVenta(list) {
+  const cont = document.getElementById('elec-lista-venta');
+  if (!list.length) { cont.innerHTML = '<div class="empty-state"><span class="icon">📺</span><p>Sin productos</p></div>'; return; }
+  cont.innerHTML = `<table><thead><tr><th>Producto</th><th>Stock</th><th>Precio</th><th></th></tr></thead><tbody>
+  ${list.map(e => `<tr>
+    <td><div class="product-cell"><div class="product-thumb">${e.foto_url?`<img src="${e.foto_url}">`:'📺'}</div>
+    <div><div class="product-name">${e.nombre}</div><div class="product-brand">${e.marca||''} ${e.modelo||''}</div></div></div></td>
+    <td>${e.stock}</td><td class="price">$${Number(e.precio_venta).toFixed(2)}</td>
+    <td><button class="btn btn-gold btn-sm" onclick="agregarElecCarrito(${e.id})" ${e.stock<=0?'disabled':''}>+</button></td>
+  </tr>`).join('')}</tbody></table>`;
+}
+function filtrarElecVenta(q) {
+  renderElecListaVenta(electronicos.filter(e => e.nombre.toLowerCase().includes(q.toLowerCase()) || (e.marca||'').toLowerCase().includes(q.toLowerCase())));
+}
+function agregarElecCarrito(id) {
+  const e = electronicos.find(x => x.id === id); if (!e || e.stock <= 0) return;
+  const existing = elecCart.find(x => x.id === id);
+  if (existing) { if (existing.qty < e.stock) existing.qty++; }
+  else elecCart.push({ id, nombre: e.nombre, precio: Number(e.precio_venta), qty: 1 });
+  renderElecCart();
+}
+function renderElecCart() {
+  const cont = document.getElementById('elec-cart-items');
+  const totalEl = document.getElementById('elec-cart-total');
+  if (!elecCart.length) { cont.innerHTML = '<div class="cart-empty">Sin productos</div>'; totalEl.textContent = '$0.00'; return; }
+  cont.innerHTML = elecCart.map(item => `
+    <div class="cart-item">
+      <div class="cart-item-info"><div class="cart-item-name">${item.nombre}</div><div class="cart-item-price">$${(item.precio*item.qty).toFixed(2)}</div></div>
+      <div class="cart-qty">
+        <div class="qty-btn" onclick="cambiarElecQty(${item.id},-1)">−</div>
+        <span style="font-size:.85rem;min-width:20px;text-align:center">${item.qty}</span>
+        <div class="qty-btn" onclick="cambiarElecQty(${item.id},1)">+</div>
+        <div class="qty-btn" onclick="removerElecCart(${item.id})" style="margin-left:4px">✕</div>
+      </div>
+    </div>`).join('');
+  totalEl.textContent = '$' + elecCart.reduce((s,x) => s + x.precio*x.qty, 0).toFixed(2);
+}
+function cambiarElecQty(id, delta) {
+  const item = elecCart.find(x => x.id === id); if (!item) return;
+  const e = electronicos.find(x => x.id === id);
+  item.qty += delta;
+  if (item.qty <= 0) elecCart = elecCart.filter(x => x.id !== id);
+  else if (e && item.qty > e.stock) item.qty = e.stock;
+  renderElecCart();
+}
+function removerElecCart(id) { elecCart = elecCart.filter(x => x.id !== id); renderElecCart(); }
+
+async function finalizarElecVenta() {
+  if (!elecCart.length) { toast('Agrega productos al carrito', 'error'); return; }
+  const tipo = document.getElementById('elec-tipo-pago').value;
+  const clienteId = document.getElementById('elec-venta-cliente').value || null;
+  const total = elecCart.reduce((s,x) => s + x.precio*x.qty, 0);
+  if ((tipo === 'apartado' || tipo === 'credito') && !clienteId) { toast('Selecciona un cliente para ' + tipo, 'error'); return; }
+  const { data: ventaData, error } = await db.from('bs_ventas').insert({ cliente_id: clienteId, total, tipo, estatus: tipo==='contado'?'completada':tipo, notas:'Electrónico' }).select().single();
+  if (error) { toast('Error al guardar', 'error'); return; }
+  if (tipo === 'contado') {
+    for (const item of elecCart) {
+      const e = electronicos.find(x => x.id === item.id);
+      if (e) await db.from('bs_electronicos').update({ stock: Math.max(0, e.stock - item.qty) }).eq('id', item.id);
+    }
+  }
+  if (tipo === 'apartado') {
+    await db.from('bs_apartados').insert({ cliente_id: clienteId, perfume_id: null, monto_total: total, anticipo: 0, saldo: total, estatus: 'activo', notas: 'Electrónico: ' + elecCart.map(x=>x.nombre).join(', ') });
+  } else if (tipo === 'credito') {
+    await db.from('bs_creditos').insert({ cliente_id: clienteId, perfume_id: null, monto_total: total, anticipo: 0, saldo: total, plazo_semanas: 4, estatus: 'activo', notas: 'Electrónico: ' + elecCart.map(x=>x.nombre).join(', ') });
+  }
+  elecCart = [];
+  await loadElectronicos();
+  renderElecCart(); renderElecListaVenta(electronicos); updateDashStats(); updateBadges();
+  toast(`Venta (${tipo}) — $${total.toFixed(2)}`, 'success');
+}
+
+// Scanner electrónicos
+async function toggleElecScanner() {
+  const video = document.getElementById('elec-scanner-video');
+  const status = document.getElementById('elec-scanner-status');
+  if (elecScannerStream) { elecScannerStream.getTracks().forEach(t=>t.stop()); elecScannerStream=null; video.style.display='none'; status.textContent='Cámara cerrada'; return; }
+  try {
+    elecScannerStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    video.srcObject = elecScannerStream; video.style.display = 'block'; await video.play();
+    status.textContent = 'Apunta al código...';
+    if ('BarcodeDetector' in window) {
+      const detector = new BarcodeDetector();
+      const detect = async () => {
+        if (!elecScannerStream) return;
+        try { const codes = await detector.detect(video); if (codes.length) { document.getElementById('elec-barcode-input').value = codes[0].rawValue; elecScannerStream.getTracks().forEach(t=>t.stop()); elecScannerStream=null; video.style.display='none'; status.textContent='✓ '+codes[0].rawValue; buscarElecBarcode(); return; } } catch(e) {}
+        requestAnimationFrame(detect);
+      }; detect();
+    }
+  } catch(e) { toast('Permiso de cámara denegado', 'error'); }
+}
+function buscarElecBarcode() {
+  const code = document.getElementById('elec-barcode-input').value.trim(); if (!code) return;
+  const e = electronicos.find(x => x.barcode === code);
+  if (e) { agregarElecCarrito(e.id); toast('✓ ' + e.nombre + ' agregado', 'success'); }
+  else { toast('Código no encontrado', 'error'); }
+  document.getElementById('elec-barcode-input').value = '';
+}
+
 // ===================== INIT =====================
 (async () => {
-  await Promise.all([loadMarcas(), loadPerfumes(), loadClientes(), loadVentas()]);
+  await Promise.all([loadMarcas(), loadPerfumes(), loadClientes(), loadVentas(), loadCategoriasElec()]);
   renderDashboard();
   updateBadges();
 })();
+
+// Patch navigate for electronics pages
+const _origNavigate = navigate;
+const extraPages = {
+  'elec-catalogo': async () => { await renderElecCatalogo(); },
+  'elec-venta': async () => { await renderElecVentaPage(); }
+};
+Object.assign(pageTitles, { 'elec-catalogo': 'Electrónicos', 'elec-venta': 'Venta Electrónico' });
+
+// Patch openModal for electronics
+const _origOpenModal = openModal;
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+  if (id === 'modal-perfume') populateMarcaSelect();
+  if (id === 'modal-apartado') { populateSelect('ap-cliente', clientes, 'nombre'); populateSelect('ap-perfume', perfumes, 'nombre'); }
+  if (id === 'modal-credito') { populateSelect('cr-cliente', clientes, 'nombre'); populateSelect('cr-perfume', perfumes, 'nombre'); }
+  if (id === 'modal-elec') { loadCategoriasElec().then(populateElecCategoriaSelect); }
+}
+
+// Extend navigate
+function navigate(page, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const pageEl = document.getElementById('page-' + page);
+  if (pageEl) pageEl.classList.add('active');
+  if (el) el.classList.add('active');
+  document.getElementById('pageTitle').textContent = pageTitles[page] || page;
+  closeSidebar();
+  const fns = {
+    dashboard: renderDashboard, inventario: renderInventario, marcas: renderMarcas,
+    ventas: renderVentaPage, historial: renderHistorial, clientes: renderClientes,
+    apartados: renderApartados, creditos: renderCreditos,
+    'elec-catalogo': renderElecCatalogo, 'elec-venta': renderElecVentaPage
+  };
+  if (fns[page]) fns[page]();
+}
 </script>
 </body>
 </html>
