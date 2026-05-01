@@ -1922,7 +1922,9 @@ async function doLogin() {
     const data = await res.json();
     if (!res.ok || data.error) {
       btn.disabled = false; btn.textContent = 'Entrar';
-      errEl.textContent = 'Usuario o contraseña incorrectos';
+      const msg = data.error_description || data.error || data.message || 'Credenciales incorrectas';
+      errEl.textContent = msg;
+      console.error('Auth error:', data);
       return;
     }
     await db.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
@@ -1933,7 +1935,8 @@ async function doLogin() {
     iniciarApp();
   } catch(e) {
     btn.disabled = false; btn.textContent = 'Entrar';
-    errEl.textContent = 'Error de conexión';
+    errEl.textContent = 'Error: ' + (e.message || e.toString());
+    console.error('Login error:', e);
   }
 }
 
