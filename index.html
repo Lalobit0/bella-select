@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -6,6 +7,7 @@
 <title>Bella Select — Sistema de Gestión</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js"></script>
 <style>
   :root {
     --gold:#C9A84C;--gold-light:#E8C97A;--gold-dim:#8B6914;
@@ -210,6 +212,7 @@
 <body>
 
 <!-- LOGIN -->
+
 <div class="login-screen" id="login-screen">
   <div class="login-box">
     <input type="hidden" id="login-email-hidden" value="">
@@ -273,309 +276,313 @@
     </div>
     <div class="content">
 
-      <!-- DASHBOARD -->
-      <div class="page" id="page-dashboard">
-        <div class="stats-grid">
-          <div class="stat-card"><div class="stat-label">Productos</div><div class="stat-value" id="stat-productos">—</div><div class="stat-sub">en catálogo</div></div>
-          <div class="stat-card"><div class="stat-label">Ventas Hoy</div><div class="stat-value" id="stat-ventas-hoy">$0</div><div class="stat-sub">contado</div></div>
-          <div class="stat-card"><div class="stat-label">Clientes</div><div class="stat-value" id="stat-clientes">—</div><div class="stat-sub">registrados</div></div>
-          <div class="stat-card"><div class="stat-label">Apartados</div><div class="stat-value" id="stat-apartados">—</div><div class="stat-sub">activos</div></div>
-          <div class="stat-card"><div class="stat-label">Por Cobrar</div><div class="stat-value" id="stat-cobrar">$0</div><div class="stat-sub">créditos+apartados</div></div>
+```
+  <!-- DASHBOARD -->
+  <div class="page" id="page-dashboard">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Productos</div><div class="stat-value" id="stat-productos">—</div><div class="stat-sub">en catálogo</div></div>
+      <div class="stat-card"><div class="stat-label">Ventas Hoy</div><div class="stat-value" id="stat-ventas-hoy">$0</div><div class="stat-sub">contado</div></div>
+      <div class="stat-card"><div class="stat-label">Clientes</div><div class="stat-value" id="stat-clientes">—</div><div class="stat-sub">registrados</div></div>
+      <div class="stat-card"><div class="stat-label">Apartados</div><div class="stat-value" id="stat-apartados">—</div><div class="stat-sub">activos</div></div>
+      <div class="stat-card"><div class="stat-label">Por Cobrar</div><div class="stat-value" id="stat-cobrar">$0</div><div class="stat-sub">créditos+apartados</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+      <div class="table-card">
+        <div class="table-header"><div class="table-title">Últimas Ventas</div></div>
+        <div id="dash-ventas"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
+      </div>
+      <div class="table-card">
+        <div class="table-header"><div class="table-title">Stock Bajo</div></div>
+        <div id="dash-stock"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
+      </div>
+    </div>
+    <div class="table-card">
+      <div class="table-header"><div class="table-title">Ventas — últimos 14 días</div></div>
+      <div style="padding:16px 20px">
+        <div class="chart-bar-wrap" id="chartBars"></div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px">
+          <span style="font-size:.6rem;color:var(--text-muted)">14 días atrás</span>
+          <span style="font-size:.6rem;color:var(--text-muted)">Hoy</span>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
-          <div class="table-card">
-            <div class="table-header"><div class="table-title">Últimas Ventas</div></div>
-            <div id="dash-ventas"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
-          </div>
-          <div class="table-card">
-            <div class="table-header"><div class="table-title">Stock Bajo</div></div>
-            <div id="dash-stock"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
-          </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INVENTARIO -->
+  <div class="page" id="page-inventario">
+    <div class="section-header">
+      <div><div class="gold-line"></div><div class="section-title">Catálogo de Perfumes</div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline" onclick="setView('list')">≡ Lista</button>
+        <button class="btn btn-outline" onclick="setView('grid')">⊞ Grid</button>
+        <button class="btn btn-gold" onclick="openModal('modal-perfume')">+ Perfume</button>
+      </div>
+    </div>
+    <div class="filters" id="filtersMarca"></div>
+    <div class="filters">
+      <button class="filter-btn active" onclick="filterGenero('all',this)">Todos</button>
+      <button class="filter-btn" onclick="filterGenero('masculino',this)">Masculino</button>
+      <button class="filter-btn" onclick="filterGenero('femenino',this)">Femenino</button>
+      <button class="filter-btn" onclick="filterGenero('unisex',this)">Unisex</button>
+    </div>
+    <div id="inventario-content"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
+  </div>
+
+  <!-- MARCAS -->
+  <div class="page" id="page-marcas">
+    <div class="section-header">
+      <div><div class="gold-line"></div><div class="section-title">Marcas</div></div>
+      <button class="btn btn-gold" onclick="openModal('modal-marca')">+ Marca</button>
+    </div>
+    <div class="table-card">
+      <table><thead><tr><th>Marca</th><th>País</th><th>Productos</th><th>Acciones</th></tr></thead>
+      <tbody id="tabla-marcas"><tr><td colspan="4"><div class="loading"><div class="spinner"></div></div></td></tr></tbody></table>
+    </div>
+  </div>
+
+  <!-- VENTAS -->
+  <div class="page active" id="page-ventas">
+    <div class="section-header"><div><div class="gold-line"></div><div class="section-title">Nueva Venta</div></div></div>
+    <div class="venta-layout">
+      <div>
+        <div class="scan-area">
+          <div style="margin-bottom:10px;color:var(--text-dim);font-size:.8rem"><strong style="color:var(--gold)">📷 Escanear código de barras</strong></div>
+          <video id="scanner-video" playsinline></video>
+          <div id="scanner-status" style="font-size:.75rem;color:var(--text-muted);margin:6px 0"></div>
+          <button class="btn btn-outline btn-sm" onclick="toggleScanner()">📷 Abrir cámara</button>
+          <span style="color:var(--text-muted);font-size:.7rem;margin:0 8px">ó</span>
+          <input type="text" id="barcode-input" placeholder="Código manual" style="width:150px;display:inline-block" onkeydown="if(event.key==='Enter')buscarBarcode()">
         </div>
         <div class="table-card">
-          <div class="table-header"><div class="table-title">Ventas — últimos 14 días</div></div>
-          <div style="padding:16px 20px">
-            <div class="chart-bar-wrap" id="chartBars"></div>
-            <div style="display:flex;justify-content:space-between;margin-top:4px">
-              <span style="font-size:.6rem;color:var(--text-muted)">14 días atrás</span>
-              <span style="font-size:.6rem;color:var(--text-muted)">Hoy</span>
-            </div>
+          <div class="table-header">
+            <div class="table-title">Seleccionar Producto</div>
+            <div class="search-box"><span>🔍</span><input type="text" placeholder="Buscar perfume..." oninput="filtrarVenta(this.value)"></div>
           </div>
+          <div id="lista-venta" style="max-height:360px;overflow-y:auto"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
         </div>
       </div>
-
-      <!-- INVENTARIO -->
-      <div class="page" id="page-inventario">
-        <div class="section-header">
-          <div><div class="gold-line"></div><div class="section-title">Catálogo de Perfumes</div></div>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-outline" onclick="setView('list')">≡ Lista</button>
-            <button class="btn btn-outline" onclick="setView('grid')">⊞ Grid</button>
-            <button class="btn btn-gold" onclick="openModal('modal-perfume')">+ Perfume</button>
+      <div class="cart">
+        <div class="cart-header"><div class="cart-title">🛒 Venta Actual</div></div>
+        <div class="cart-items" id="cart-items"><div class="cart-empty">Sin productos</div></div>
+        <div class="cart-footer">
+          <div class="cart-total"><span class="cart-total-label">Subtotal</span><span class="cart-total-value" id="cart-total">$0.00</span></div>
+          <div id="cart-descuento-info" style="display:none;font-size:.72rem;color:#4CAF7C;margin-bottom:8px">✓ Descuento 5% aplicado</div>
+          <div id="cart-credito-info" style="display:none;font-size:.72rem;color:var(--gold);margin-bottom:8px;line-height:1.6"></div>
+          <div class="cart-total" style="margin-bottom:12px">
+            <span class="cart-total-label" style="font-weight:600">Total Final</span>
+            <span class="cart-total-value" id="cart-total-final" style="font-size:1.5rem">$0.00</span>
           </div>
-        </div>
-        <div class="filters" id="filtersMarca"></div>
-        <div class="filters">
-          <button class="filter-btn active" onclick="filterGenero('all',this)">Todos</button>
-          <button class="filter-btn" onclick="filterGenero('masculino',this)">Masculino</button>
-          <button class="filter-btn" onclick="filterGenero('femenino',this)">Femenino</button>
-          <button class="filter-btn" onclick="filterGenero('unisex',this)">Unisex</button>
-        </div>
-        <div id="inventario-content"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
-      </div>
-
-      <!-- MARCAS -->
-      <div class="page" id="page-marcas">
-        <div class="section-header">
-          <div><div class="gold-line"></div><div class="section-title">Marcas</div></div>
-          <button class="btn btn-gold" onclick="openModal('modal-marca')">+ Marca</button>
-        </div>
-        <div class="table-card">
-          <table><thead><tr><th>Marca</th><th>País</th><th>Productos</th><th>Acciones</th></tr></thead>
-          <tbody id="tabla-marcas"><tr><td colspan="4"><div class="loading"><div class="spinner"></div></div></td></tr></tbody></table>
-        </div>
-      </div>
-
-      <!-- VENTAS -->
-      <div class="page active" id="page-ventas">
-        <div class="section-header"><div><div class="gold-line"></div><div class="section-title">Nueva Venta</div></div></div>
-        <div class="venta-layout">
-          <div>
-            <div class="scan-area">
-              <div style="margin-bottom:10px;color:var(--text-dim);font-size:.8rem"><strong style="color:var(--gold)">📷 Escanear código de barras</strong></div>
-              <video id="scanner-video" playsinline></video>
-              <div id="scanner-status" style="font-size:.75rem;color:var(--text-muted);margin:6px 0"></div>
-              <button class="btn btn-outline btn-sm" onclick="toggleScanner()">📷 Abrir cámara</button>
-              <span style="color:var(--text-muted);font-size:.7rem;margin:0 8px">ó</span>
-              <input type="text" id="barcode-input" placeholder="Código manual" style="width:150px;display:inline-block" onkeydown="if(event.key==='Enter')buscarBarcode()">
-            </div>
-            <div class="table-card">
-              <div class="table-header">
-                <div class="table-title">Seleccionar Producto</div>
-                <div class="search-box"><span>🔍</span><input type="text" placeholder="Buscar perfume..." oninput="filtrarVenta(this.value)"></div>
-              </div>
-              <div id="lista-venta" style="max-height:360px;overflow-y:auto"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
-            </div>
-          </div>
-          <div class="cart">
-            <div class="cart-header"><div class="cart-title">🛒 Venta Actual</div></div>
-            <div class="cart-items" id="cart-items"><div class="cart-empty">Sin productos</div></div>
-            <div class="cart-footer">
-              <div class="cart-total"><span class="cart-total-label">Subtotal</span><span class="cart-total-value" id="cart-total">$0.00</span></div>
-              <div id="cart-descuento-info" style="display:none;font-size:.72rem;color:#4CAF7C;margin-bottom:8px">✓ Descuento 5% aplicado</div>
-              <div id="cart-credito-info" style="display:none;font-size:.72rem;color:var(--gold);margin-bottom:8px;line-height:1.6"></div>
-              <div class="cart-total" style="margin-bottom:12px">
-                <span class="cart-total-label" style="font-weight:600">Total Final</span>
-                <span class="cart-total-value" id="cart-total-final" style="font-size:1.5rem">$0.00</span>
-              </div>
-              <div class="form-group" style="margin-bottom:10px"><label>Tipo de pago</label>
-                <select id="tipo-pago" onchange="actualizarResumenVenta()">
-                  <option value="contado">Contado</option>
-                  <option value="apartado">Apartado</option>
-                  <option value="credito">Crédito</option>
-                </select>
-              </div>
-              <div id="credito-opciones" style="display:none">
-                <div class="form-group" style="margin-bottom:10px"><label>Plazo</label>
-                  <select id="credito-semanas" onchange="actualizarResumenVenta()">
-                    <option value="4">4 semanas (+20%)</option>
-                    <option value="6">6 semanas (+25%)</option>
-                    <option value="8">8 semanas (+30%)</option>
-                    <option value="12">12 semanas (+35%)</option>
-                  </select>
-                </div>
-              </div>
-              <div class="form-group" style="margin-bottom:10px">
-                <label>Cliente</label>
-                <div style="display:flex;gap:6px">
-                  <select id="venta-cliente" style="flex:1"><option value="">Sin cliente</option></select>
-                  <button class="btn btn-outline btn-sm" onclick="openModalClienteRapido()" title="Nuevo cliente" style="flex-shrink:0">+</button>
-                </div>
-              </div>
-              <button class="btn btn-gold" style="width:100%" onclick="finalizarVenta()">Finalizar Venta</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- HISTORIAL -->
-      <div class="page" id="page-historial">
-        <div class="section-header"><div><div class="gold-line"></div><div class="section-title">Historial de Ventas</div></div></div>
-        <div class="table-card">
-          <div class="table-header"><div class="table-title">Todas las Ventas</div>
-            <input type="date" id="filtro-fecha" onchange="renderHistorial()" style="width:auto">
-          </div>
-          <table><thead><tr><th>#</th><th>Fecha</th><th>Cliente</th><th>Items</th><th>Total</th><th>Tipo</th><th>Estatus</th></tr></thead>
-          <tbody id="tabla-historial"><tr><td colspan="7"><div class="loading"><div class="spinner"></div></div></td></tr></tbody></table>
-        </div>
-      </div>
-
-      <!-- CLIENTES -->
-      <div class="page" id="page-clientes">
-        <div class="section-header">
-          <div><div class="gold-line"></div><div class="section-title">Clientes</div></div>
-          <button class="btn btn-gold" onclick="openModal('modal-cliente')">+ Cliente</button>
-        </div>
-        <div class="table-card">
-          <div class="table-header"><div class="table-title">Registro</div>
-            <div class="search-box"><span>🔍</span><input type="text" placeholder="Buscar..." oninput="filtrarClientes(this.value)"></div>
-          </div>
-          <table><thead><tr><th>Cliente</th><th>Teléfono</th><th>Compras</th><th>Saldo</th><th>Acciones</th></tr></thead>
-          <tbody id="tabla-clientes"><tr><td colspan="5"><div class="loading"><div class="spinner"></div></div></td></tr></tbody></table>
-        </div>
-      </div>
-
-      <!-- APARTADOS -->
-      <div class="page" id="page-apartados">
-        <div class="section-header">
-          <div><div class="gold-line"></div><div class="section-title">Apartados</div></div>
-          <button class="btn btn-gold" onclick="openModal('modal-apartado')">+ Apartado</button>
-        </div>
-        <div class="tabs">
-          <button class="tab active" onclick="tabFilter('apartados','activo',this)">Activos</button>
-          <button class="tab" onclick="tabFilter('apartados','completado',this)">Completados</button>
-          <button class="tab" onclick="tabFilter('apartados','cancelado',this)">Cancelados</button>
-        </div>
-        <div id="lista-apartados"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
-      </div>
-
-      <!-- CREDITOS -->
-      <div class="page" id="page-creditos">
-        <div class="section-header">
-          <div><div class="gold-line"></div><div class="section-title">Créditos</div></div>
-          <button class="btn btn-gold" onclick="openModal('modal-credito')">+ Crédito</button>
-        </div>
-        <div class="tabs">
-          <button class="tab active" onclick="tabFilter('creditos','activo',this)">Activos</button>
-          <button class="tab" onclick="tabFilter('creditos','liquidado',this)">Liquidados</button>
-        </div>
-        <div id="lista-creditos"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
-      </div>
-
-      <!-- LOG ADMIN -->
-      <div class="page" id="page-log">
-        <div class="section-header">
-          <div><div class="gold-line"></div><div class="section-title">Log de Movimientos</div></div>
-          <button class="btn btn-outline btn-sm" onclick="renderLog()">↻ Actualizar</button>
-        </div>
-        <div class="filters" style="margin-bottom:16px">
-          <button class="filter-btn active" onclick="filtrarLog('all',this)">Todos</button>
-          <button class="filter-btn" onclick="filtrarLog('venta',this)">Ventas</button>
-          <button class="filter-btn" onclick="filtrarLog('crear',this)">Creaciones</button>
-          <button class="filter-btn" onclick="filtrarLog('editar',this)">Ediciones</button>
-          <button class="filter-btn" onclick="filtrarLog('eliminar',this)">Eliminaciones</button>
-          <button class="filter-btn" onclick="filtrarLog('pago',this)">Pagos</button>
-          <button class="filter-btn" onclick="filtrarLog('login',this)">Accesos</button>
-        </div>
-        <div class="table-card">
-          <table><thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Módulo</th><th>Descripción</th></tr></thead>
-          <tbody id="tabla-log"><tr><td colspan="5"><div class="loading"><div class="spinner"></div>Cargando...</div></td></tr></tbody></table>
-        </div>
-      </div>
-
-      <!-- MIS VENTAS (vendedor) -->
-      <div class="page" id="page-mis-ventas">
-        <div class="section-header">
-          <div><div class="gold-line"></div><div class="section-title">Mis Ventas y Comisiones</div></div>
-        </div>
-        <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:20px">
-          <div class="stat-card"><div class="stat-label">Ventas del Mes</div><div class="stat-value" id="mv-total-ventas">$0</div><div class="stat-sub">en ventas</div></div>
-          <div class="stat-card"><div class="stat-label">Comisión (10%)</div><div class="stat-value" id="mv-total-comision" style="color:#4CAF7C">$0</div><div class="stat-sub">ganado</div></div>
-          <div class="stat-card"><div class="stat-label">Num. Ventas</div><div class="stat-value" id="mv-num-ventas">0</div><div class="stat-sub">este mes</div></div>
-        </div>
-        <div class="table-card">
-          <div class="table-header"><div class="table-title">Historial de Mis Ventas</div></div>
-          <table><thead><tr><th>Fecha</th><th>Productos</th><th>Total</th><th>Tipo</th><th>Comisión</th></tr></thead>
-          <tbody id="tabla-mis-ventas"><tr><td colspan="5"><div class="loading"><div class="spinner"></div>Cargando...</div></td></tr></tbody></table>
-        </div>
-      </div>
-
-      <!-- VENTAS VENDEDORES (admin) -->
-      <div class="page" id="page-ventas-vendedores">
-        <div class="section-header">
-          <div><div class="gold-line"></div><div class="section-title">Ventas por Vendedor</div></div>
-          <button class="btn btn-outline btn-sm" onclick="renderVentasVendedores()">↻ Actualizar</button>
-        </div>
-        <!-- Stats por vendedor -->
-        <div id="vv-stats" style="margin-bottom:20px"></div>
-        <!-- Filtros -->
-        <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
-          <div class="form-group" style="margin:0">
-            <select id="vv-filtro-vendedor" onchange="renderVentasVendedores()" style="width:180px">
-              <option value="">Todos los vendedores</option>
+          <div class="form-group" style="margin-bottom:10px"><label>Tipo de pago</label>
+            <select id="tipo-pago" onchange="actualizarResumenVenta()">
+              <option value="contado">Contado</option>
+              <option value="apartado">Apartado</option>
+              <option value="credito">Crédito</option>
             </select>
           </div>
-          <div class="form-group" style="margin:0">
-            <input type="month" id="vv-filtro-mes" onchange="renderVentasVendedores()" style="width:160px">
-          </div>
-        </div>
-        <!-- Tabla -->
-        <div class="table-card">
-          <div class="table-header"><div class="table-title">Detalle de Ventas</div></div>
-          <table><thead><tr><th>Fecha</th><th>Vendedor</th><th>Cliente</th><th>Total</th><th>Tipo</th><th>Comisión</th><th>Comprobante</th></tr></thead>
-          <tbody id="tabla-ventas-vendedores"><tr><td colspan="7"><div class="loading"><div class="spinner"></div>Cargando...</div></td></tr></tbody></table>
-        </div>
-      </div>
-
-      <!-- ELECTRÓNICOS CATÁLOGO -->
-      <div class="page" id="page-elec-catalogo">
-        <div class="section-header">
-          <div><div class="gold-line"></div><div class="section-title">Electrónicos</div></div>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-outline" onclick="setElecView('list')">≡ Lista</button>
-            <button class="btn btn-outline" onclick="setElecView('grid')">⊞ Grid</button>
-            <button class="btn btn-gold" onclick="openModal('modal-elec')">+ Producto</button>
-          </div>
-        </div>
-        <div class="filters" id="elec-cat-filters"></div>
-        <div id="elec-catalogo-content"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
-      </div>
-
-      <!-- ELECTRÓNICOS VENTA -->
-      <div class="page" id="page-elec-venta">
-        <div class="section-header"><div><div class="gold-line"></div><div class="section-title">Venta — Electrónico</div></div></div>
-        <div class="venta-layout">
-          <div>
-            <div class="scan-area">
-              <div style="margin-bottom:10px;color:var(--text-dim);font-size:.8rem"><strong style="color:var(--gold)">📷 Escanear código</strong></div>
-              <video id="elec-scanner-video" playsinline style="display:none;width:100%;max-width:300px;border-radius:8px"></video>
-              <div id="elec-scanner-status" style="font-size:.75rem;color:var(--text-muted);margin:6px 0"></div>
-              <button class="btn btn-outline btn-sm" onclick="toggleElecScanner()">📷 Abrir cámara</button>
-              <span style="color:var(--text-muted);font-size:.7rem;margin:0 8px">ó</span>
-              <input type="text" id="elec-barcode-input" placeholder="Código manual" style="width:150px;display:inline-block" onkeydown="if(event.key==='Enter')buscarElecBarcode()">
-            </div>
-            <div class="table-card">
-              <div class="table-header">
-                <div class="table-title">Seleccionar Producto</div>
-                <div class="search-box"><span>🔍</span><input type="text" placeholder="Buscar..." oninput="filtrarElecVenta(this.value)"></div>
-              </div>
-              <div id="elec-lista-venta" style="max-height:360px;overflow-y:auto"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
+          <div id="credito-opciones" style="display:none">
+            <div class="form-group" style="margin-bottom:10px"><label>Plazo</label>
+              <select id="credito-semanas" onchange="actualizarResumenVenta()">
+                <option value="4">4 semanas (+20%)</option>
+                <option value="6">6 semanas (+25%)</option>
+                <option value="8">8 semanas (+30%)</option>
+                <option value="12">12 semanas (+35%)</option>
+              </select>
             </div>
           </div>
-          <div class="cart">
-            <div class="cart-header"><div class="cart-title">🛒 Venta Electrónico</div></div>
-            <div class="cart-items" id="elec-cart-items"><div class="cart-empty">Sin productos</div></div>
-            <div class="cart-footer">
-              <div class="cart-total"><span class="cart-total-label">Total</span><span class="cart-total-value" id="elec-cart-total">$0.00</span></div>
-              <div class="form-group" style="margin-bottom:10px"><label>Tipo de pago</label>
-                <select id="elec-tipo-pago"><option value="contado">Contado</option><option value="apartado">Apartado</option><option value="credito">Crédito</option></select>
-              </div>
-              <div class="form-group" style="margin-bottom:10px"><label>Cliente</label>
-                <select id="elec-venta-cliente"><option value="">Sin cliente</option></select>
-              </div>
-              <button class="btn btn-gold" style="width:100%" onclick="finalizarElecVenta()">Finalizar Venta</button>
+          <div class="form-group" style="margin-bottom:10px">
+            <label>Cliente</label>
+            <div style="display:flex;gap:6px">
+              <select id="venta-cliente" style="flex:1"><option value="">Sin cliente</option></select>
+              <button class="btn btn-outline btn-sm" onclick="openModalClienteRapido()" title="Nuevo cliente" style="flex-shrink:0">+</button>
             </div>
           </div>
+          <button class="btn btn-gold" style="width:100%" onclick="finalizarVenta()">Finalizar Venta</button>
         </div>
       </div>
-
     </div>
+  </div>
+
+  <!-- HISTORIAL -->
+  <div class="page" id="page-historial">
+    <div class="section-header"><div><div class="gold-line"></div><div class="section-title">Historial de Ventas</div></div></div>
+    <div class="table-card">
+      <div class="table-header"><div class="table-title">Todas las Ventas</div>
+        <input type="date" id="filtro-fecha" onchange="renderHistorial()" style="width:auto">
+      </div>
+      <table><thead><tr><th>#</th><th>Fecha</th><th>Cliente</th><th>Items</th><th>Total</th><th>Tipo</th><th>Estatus</th></tr></thead>
+      <tbody id="tabla-historial"><tr><td colspan="7"><div class="loading"><div class="spinner"></div></div></td></tr></tbody></table>
+    </div>
+  </div>
+
+  <!-- CLIENTES -->
+  <div class="page" id="page-clientes">
+    <div class="section-header">
+      <div><div class="gold-line"></div><div class="section-title">Clientes</div></div>
+      <button class="btn btn-gold" onclick="openModal('modal-cliente')">+ Cliente</button>
+    </div>
+    <div class="table-card">
+      <div class="table-header"><div class="table-title">Registro</div>
+        <div class="search-box"><span>🔍</span><input type="text" placeholder="Buscar..." oninput="filtrarClientes(this.value)"></div>
+      </div>
+      <table><thead><tr><th>Cliente</th><th>Teléfono</th><th>Compras</th><th>Saldo</th><th>Acciones</th></tr></thead>
+      <tbody id="tabla-clientes"><tr><td colspan="5"><div class="loading"><div class="spinner"></div></div></td></tr></tbody></table>
+    </div>
+  </div>
+
+  <!-- APARTADOS -->
+  <div class="page" id="page-apartados">
+    <div class="section-header">
+      <div><div class="gold-line"></div><div class="section-title">Apartados</div></div>
+      <button class="btn btn-gold" onclick="openModal('modal-apartado')">+ Apartado</button>
+    </div>
+    <div class="tabs">
+      <button class="tab active" onclick="tabFilter('apartados','activo',this)">Activos</button>
+      <button class="tab" onclick="tabFilter('apartados','completado',this)">Completados</button>
+      <button class="tab" onclick="tabFilter('apartados','cancelado',this)">Cancelados</button>
+    </div>
+    <div id="lista-apartados"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
+  </div>
+
+  <!-- CREDITOS -->
+  <div class="page" id="page-creditos">
+    <div class="section-header">
+      <div><div class="gold-line"></div><div class="section-title">Créditos</div></div>
+      <button class="btn btn-gold" onclick="openModal('modal-credito')">+ Crédito</button>
+    </div>
+    <div class="tabs">
+      <button class="tab active" onclick="tabFilter('creditos','activo',this)">Activos</button>
+      <button class="tab" onclick="tabFilter('creditos','liquidado',this)">Liquidados</button>
+    </div>
+    <div id="lista-creditos"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
+  </div>
+
+  <!-- LOG ADMIN -->
+  <div class="page" id="page-log">
+    <div class="section-header">
+      <div><div class="gold-line"></div><div class="section-title">Log de Movimientos</div></div>
+      <button class="btn btn-outline btn-sm" onclick="renderLog()">↻ Actualizar</button>
+    </div>
+    <div class="filters" style="margin-bottom:16px">
+      <button class="filter-btn active" onclick="filtrarLog('all',this)">Todos</button>
+      <button class="filter-btn" onclick="filtrarLog('venta',this)">Ventas</button>
+      <button class="filter-btn" onclick="filtrarLog('crear',this)">Creaciones</button>
+      <button class="filter-btn" onclick="filtrarLog('editar',this)">Ediciones</button>
+      <button class="filter-btn" onclick="filtrarLog('eliminar',this)">Eliminaciones</button>
+      <button class="filter-btn" onclick="filtrarLog('pago',this)">Pagos</button>
+      <button class="filter-btn" onclick="filtrarLog('login',this)">Accesos</button>
+    </div>
+    <div class="table-card">
+      <table><thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Módulo</th><th>Descripción</th></tr></thead>
+      <tbody id="tabla-log"><tr><td colspan="5"><div class="loading"><div class="spinner"></div>Cargando...</div></td></tr></tbody></table>
+    </div>
+  </div>
+
+  <!-- MIS VENTAS (vendedor) -->
+  <div class="page" id="page-mis-ventas">
+    <div class="section-header">
+      <div><div class="gold-line"></div><div class="section-title">Mis Ventas y Comisiones</div></div>
+    </div>
+    <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:20px">
+      <div class="stat-card"><div class="stat-label">Ventas del Mes</div><div class="stat-value" id="mv-total-ventas">$0</div><div class="stat-sub">en ventas</div></div>
+      <div class="stat-card"><div class="stat-label">Comisión (10%)</div><div class="stat-value" id="mv-total-comision" style="color:#4CAF7C">$0</div><div class="stat-sub">ganado</div></div>
+      <div class="stat-card"><div class="stat-label">Num. Ventas</div><div class="stat-value" id="mv-num-ventas">0</div><div class="stat-sub">este mes</div></div>
+    </div>
+    <div class="table-card">
+      <div class="table-header"><div class="table-title">Historial de Mis Ventas</div></div>
+      <table><thead><tr><th>Fecha</th><th>Productos</th><th>Total</th><th>Tipo</th><th>Comisión</th></tr></thead>
+      <tbody id="tabla-mis-ventas"><tr><td colspan="5"><div class="loading"><div class="spinner"></div>Cargando...</div></td></tr></tbody></table>
+    </div>
+  </div>
+
+  <!-- VENTAS VENDEDORES (admin) -->
+  <div class="page" id="page-ventas-vendedores">
+    <div class="section-header">
+      <div><div class="gold-line"></div><div class="section-title">Ventas por Vendedor</div></div>
+      <button class="btn btn-outline btn-sm" onclick="renderVentasVendedores()">↻ Actualizar</button>
+    </div>
+    <!-- Stats por vendedor -->
+    <div id="vv-stats" style="margin-bottom:20px"></div>
+    <!-- Filtros -->
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+      <div class="form-group" style="margin:0">
+        <select id="vv-filtro-vendedor" onchange="renderVentasVendedores()" style="width:180px">
+          <option value="">Todos los vendedores</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin:0">
+        <input type="month" id="vv-filtro-mes" onchange="renderVentasVendedores()" style="width:160px">
+      </div>
+    </div>
+    <!-- Tabla -->
+    <div class="table-card">
+      <div class="table-header"><div class="table-title">Detalle de Ventas</div></div>
+      <table><thead><tr><th>Fecha</th><th>Vendedor</th><th>Cliente</th><th>Total</th><th>Tipo</th><th>Comisión</th><th>Comprobante</th></tr></thead>
+      <tbody id="tabla-ventas-vendedores"><tr><td colspan="7"><div class="loading"><div class="spinner"></div>Cargando...</div></td></tr></tbody></table>
+    </div>
+  </div>
+
+  <!-- ELECTRÓNICOS CATÁLOGO -->
+  <div class="page" id="page-elec-catalogo">
+    <div class="section-header">
+      <div><div class="gold-line"></div><div class="section-title">Electrónicos</div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline" onclick="setElecView('list')">≡ Lista</button>
+        <button class="btn btn-outline" onclick="setElecView('grid')">⊞ Grid</button>
+        <button class="btn btn-gold" onclick="openModal('modal-elec')">+ Producto</button>
+      </div>
+    </div>
+    <div class="filters" id="elec-cat-filters"></div>
+    <div id="elec-catalogo-content"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
+  </div>
+
+  <!-- ELECTRÓNICOS VENTA -->
+  <div class="page" id="page-elec-venta">
+    <div class="section-header"><div><div class="gold-line"></div><div class="section-title">Venta — Electrónico</div></div></div>
+    <div class="venta-layout">
+      <div>
+        <div class="scan-area">
+          <div style="margin-bottom:10px;color:var(--text-dim);font-size:.8rem"><strong style="color:var(--gold)">📷 Escanear código</strong></div>
+          <video id="elec-scanner-video" playsinline style="display:none;width:100%;max-width:300px;border-radius:8px"></video>
+          <div id="elec-scanner-status" style="font-size:.75rem;color:var(--text-muted);margin:6px 0"></div>
+          <button class="btn btn-outline btn-sm" onclick="toggleElecScanner()">📷 Abrir cámara</button>
+          <span style="color:var(--text-muted);font-size:.7rem;margin:0 8px">ó</span>
+          <input type="text" id="elec-barcode-input" placeholder="Código manual" style="width:150px;display:inline-block" onkeydown="if(event.key==='Enter')buscarElecBarcode()">
+        </div>
+        <div class="table-card">
+          <div class="table-header">
+            <div class="table-title">Seleccionar Producto</div>
+            <div class="search-box"><span>🔍</span><input type="text" placeholder="Buscar..." oninput="filtrarElecVenta(this.value)"></div>
+          </div>
+          <div id="elec-lista-venta" style="max-height:360px;overflow-y:auto"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
+        </div>
+      </div>
+      <div class="cart">
+        <div class="cart-header"><div class="cart-title">🛒 Venta Electrónico</div></div>
+        <div class="cart-items" id="elec-cart-items"><div class="cart-empty">Sin productos</div></div>
+        <div class="cart-footer">
+          <div class="cart-total"><span class="cart-total-label">Total</span><span class="cart-total-value" id="elec-cart-total">$0.00</span></div>
+          <div class="form-group" style="margin-bottom:10px"><label>Tipo de pago</label>
+            <select id="elec-tipo-pago"><option value="contado">Contado</option><option value="apartado">Apartado</option><option value="credito">Crédito</option></select>
+          </div>
+          <div class="form-group" style="margin-bottom:10px"><label>Cliente</label>
+            <select id="elec-venta-cliente"><option value="">Sin cliente</option></select>
+          </div>
+          <button class="btn btn-gold" style="width:100%" onclick="finalizarElecVenta()">Finalizar Venta</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+```
+
   </div>
 </div>
 
 <div class="toast-wrap" id="toastWrap"></div>
 
 <!-- MODAL PERFUME -->
+
 <div class="modal-overlay" id="modal-perfume">
   <div class="modal">
     <div class="modal-header"><div class="modal-title" id="modal-perfume-title">Registrar Perfume</div><button class="modal-close" onclick="closeModal('modal-perfume')">✕</button></div>
@@ -617,6 +624,7 @@
 </div>
 
 <!-- MODAL MARCA -->
+
 <div class="modal-overlay" id="modal-marca">
   <div class="modal" style="max-width:400px">
     <div class="modal-header"><div class="modal-title">Nueva Marca</div><button class="modal-close" onclick="closeModal('modal-marca')">✕</button></div>
@@ -635,6 +643,7 @@
 </div>
 
 <!-- MODAL CLIENTE -->
+
 <div class="modal-overlay" id="modal-cliente">
   <div class="modal" style="max-width:460px">
     <div class="modal-header"><div class="modal-title">Nuevo Cliente</div><button class="modal-close" onclick="closeModal('modal-cliente')">✕</button></div>
@@ -655,6 +664,7 @@
 </div>
 
 <!-- MODAL APARTADO -->
+
 <div class="modal-overlay" id="modal-apartado">
   <div class="modal" style="max-width:460px">
     <div class="modal-header"><div class="modal-title">Nuevo Apartado</div><button class="modal-close" onclick="closeModal('modal-apartado')">✕</button></div>
@@ -676,6 +686,7 @@
 </div>
 
 <!-- MODAL CREDITO -->
+
 <div class="modal-overlay" id="modal-credito">
   <div class="modal" style="max-width:460px">
     <div class="modal-header"><div class="modal-title">Nuevo Crédito</div><button class="modal-close" onclick="closeModal('modal-credito')">✕</button></div>
@@ -697,6 +708,7 @@
 </div>
 
 <!-- MODAL CLIENTE RÁPIDO -->
+
 <div class="modal-overlay" id="modal-cliente-rapido">
   <div class="modal" style="max-width:420px">
     <div class="modal-header">
@@ -719,6 +731,7 @@
 </div>
 
 <!-- MODAL PAGO -->
+
 <div class="modal-overlay" id="modal-pago">
   <div class="modal" style="max-width:380px">
     <div class="modal-header"><div class="modal-title">Registrar Pago</div><button class="modal-close" onclick="closeModal('modal-pago')">✕</button></div>
@@ -740,6 +753,7 @@
 </div>
 
 <!-- MODAL ELECTRÓNICO -->
+
 <div class="modal-overlay" id="modal-elec">
   <div class="modal">
     <div class="modal-header"><div class="modal-title" id="modal-elec-title">Nuevo Electrónico</div><button class="modal-close" onclick="closeModal('modal-elec')">✕</button></div>
@@ -872,35 +886,38 @@ function handlePhoto(input) {
 }
 
 // ===================== SCANNER =====================
+let zxingReader = null;
+
 async function toggleScanner() {
   const video = document.getElementById('scanner-video');
   const status = document.getElementById('scanner-status');
-  if (scannerStream) { stopScanner(); status.textContent = 'Cámara cerrada'; return; }
+  if (scannerStream) { stopScanner(); status.textContent = ''; return; }
+  video.style.display = 'block';
+  status.textContent = 'Iniciando cámara...';
   try {
-    scannerStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-    video.srcObject = scannerStream; video.style.display = 'block';
-    await video.play();
+    if (!zxingReader) zxingReader = new ZXing.BrowserMultiFormatReader();
+    const devices = await ZXing.BrowserMultiFormatReader.listVideoInputDevices();
+    const backCam = devices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('trasera') || d.label.toLowerCase().includes('environment')) || devices[devices.length - 1];
+    await zxingReader.decodeFromVideoDevice(backCam?.deviceId, video, (result, err) => {
+      if (result) {
+        const code = result.getText();
+        document.getElementById('barcode-input').value = code;
+        status.textContent = '✓ Código: ' + code;
+        stopScanner();
+        buscarBarcode();
+      }
+    });
+    scannerStream = true;
     status.textContent = 'Apunta al código de barras...';
-    if ('BarcodeDetector' in window) {
-      const detector = new BarcodeDetector();
-      const detect = async () => {
-        if (!scannerStream) return;
-        try {
-          const codes = await detector.detect(video);
-          if (codes.length) {
-            document.getElementById('barcode-input').value = codes[0].rawValue;
-            stopScanner(); status.textContent = '✓ Código: ' + codes[0].rawValue;
-            buscarBarcode(); return;
-          }
-        } catch(e) {}
-        requestAnimationFrame(detect);
-      };
-      detect();
-    } else { status.textContent = 'Ingresa el código manualmente'; }
-  } catch(e) { status.textContent = 'No se pudo acceder a la cámara'; toast('Permiso de cámara denegado', 'error'); }
+  } catch(e) {
+    video.style.display = 'none';
+    status.textContent = 'No se pudo acceder a la cámara';
+    toast('Permiso de cámara denegado', 'error');
+  }
 }
 function stopScanner() {
-  if (scannerStream) { scannerStream.getTracks().forEach(t => t.stop()); scannerStream = null; }
+  if (zxingReader) { try { zxingReader.reset(); } catch(e) {} }
+  scannerStream = null;
   const video = document.getElementById('scanner-video');
   if (video) { video.style.display = 'none'; video.srcObject = null; }
 }
@@ -1827,23 +1844,39 @@ async function finalizarElecVenta() {
 }
 
 // Scanner electrónicos
+let zxingReaderElec = null;
+
 async function toggleElecScanner() {
   const video = document.getElementById('elec-scanner-video');
   const status = document.getElementById('elec-scanner-status');
-  if (elecScannerStream) { elecScannerStream.getTracks().forEach(t=>t.stop()); elecScannerStream=null; video.style.display='none'; status.textContent='Cámara cerrada'; return; }
+  if (elecScannerStream) { stopElecScanner(); status.textContent = ''; return; }
+  video.style.display = 'block';
+  status.textContent = 'Iniciando cámara...';
   try {
-    elecScannerStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-    video.srcObject = elecScannerStream; video.style.display = 'block'; await video.play();
-    status.textContent = 'Apunta al código...';
-    if ('BarcodeDetector' in window) {
-      const detector = new BarcodeDetector();
-      const detect = async () => {
-        if (!elecScannerStream) return;
-        try { const codes = await detector.detect(video); if (codes.length) { document.getElementById('elec-barcode-input').value = codes[0].rawValue; elecScannerStream.getTracks().forEach(t=>t.stop()); elecScannerStream=null; video.style.display='none'; status.textContent='✓ '+codes[0].rawValue; buscarElecBarcode(); return; } } catch(e) {}
-        requestAnimationFrame(detect);
-      }; detect();
-    }
-  } catch(e) { toast('Permiso de cámara denegado', 'error'); }
+    if (!zxingReaderElec) zxingReaderElec = new ZXing.BrowserMultiFormatReader();
+    const devices = await ZXing.BrowserMultiFormatReader.listVideoInputDevices();
+    const backCam = devices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('trasera') || d.label.toLowerCase().includes('environment')) || devices[devices.length - 1];
+    await zxingReaderElec.decodeFromVideoDevice(backCam?.deviceId, video, (result, err) => {
+      if (result) {
+        const code = result.getText();
+        document.getElementById('elec-barcode-input').value = code;
+        status.textContent = '✓ Código: ' + code;
+        stopElecScanner();
+        buscarElecBarcode();
+      }
+    });
+    elecScannerStream = true;
+    status.textContent = 'Apunta al código de barras...';
+  } catch(e) {
+    video.style.display = 'none';
+    toast('Permiso de cámara denegado', 'error');
+  }
+}
+function stopElecScanner() {
+  if (zxingReaderElec) { try { zxingReaderElec.reset(); } catch(e) {} }
+  elecScannerStream = null;
+  const video = document.getElementById('elec-scanner-video');
+  if (video) video.style.display = 'none';
 }
 function buscarElecBarcode() {
   const code = document.getElementById('elec-barcode-input').value.trim(); if (!code) return;
@@ -1984,6 +2017,7 @@ function generarComprobante(venta, items, r) {
     .aviso{background:#fffbe6;border:1px solid #f0d060;border-radius:8px;padding:10px;font-size:.78rem;margin-top:12px;}
     @media print{body{padding:0;}}
   </style></head><body>
+
   <div class="logo">Bella Select</div>
   <div class="sub">Comprobante de Venta</div>
   <hr>
@@ -2016,127 +2050,131 @@ function generarComprobante(venta, items, r) {
   <div class="footer">Bella Select • Gracias por su compra<br>${new Date().getFullYear()}</div>
   </body></html>`;
 
-  const win = window.open('', '_blank', 'width=480,height=700');
-  win.document.write(html);
-  win.document.close();
-  setTimeout(() => win.print(), 500);
+const win = window.open(’’, ‘_blank’, ‘width=480,height=700’);
+win.document.write(html);
+win.document.close();
+setTimeout(() => win.print(), 500);
 }
 
 // ===================== VENTAS VENDEDORES (admin) =====================
 async function renderVentasVendedores() {
-  const tbody = document.getElementById('tabla-ventas-vendedores');
-  const statsDiv = document.getElementById('vv-stats');
-  if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="7"><div class="loading"><div class="spinner"></div>Cargando...</div></td></tr>';
-  try {
-    // Build query
-    const mesInput = document.getElementById('vv-filtro-mes')?.value;
-    const vendedorFiltro = document.getElementById('vv-filtro-vendedor')?.value;
-    let query = db.from('bs_ventas').select('*').not('vendedor_id', 'is', null).order('fecha', { ascending: false }).limit(300);
-    if (mesInput) {
-      const [y, m] = mesInput.split('-');
-      const desde = `${y}-${m}-01T00:00:00`;
-      const hasta = new Date(y, m, 0);
-      query = query.gte('fecha', desde).lte('fecha', `${y}-${m}-${String(hasta.getDate()).padStart(2,'0')}T23:59:59`);
-    }
-    if (vendedorFiltro) query = query.eq('vendedor_id', vendedorFiltro);
-    const { data, error } = await query;
-    if (error || !data) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><p>Sin datos</p></div></td></tr>'; return; }
+const tbody = document.getElementById(‘tabla-ventas-vendedores’);
+const statsDiv = document.getElementById(‘vv-stats’);
+if (!tbody) return;
+tbody.innerHTML = ‘<tr><td colspan="7"><div class="loading"><div class="spinner"></div>Cargando…</div></td></tr>’;
+try {
+// Build query
+const mesInput = document.getElementById(‘vv-filtro-mes’)?.value;
+const vendedorFiltro = document.getElementById(‘vv-filtro-vendedor’)?.value;
+let query = db.from(‘bs_ventas’).select(’*’).not(‘vendedor_id’, ‘is’, null).order(‘fecha’, { ascending: false }).limit(300);
+if (mesInput) {
+const [y, m] = mesInput.split(’-’);
+const desde = `${y}-${m}-01T00:00:00`;
+const hasta = new Date(y, m, 0);
+query = query.gte(‘fecha’, desde).lte(‘fecha’, `${y}-${m}-${String(hasta.getDate()).padStart(2,'0')}T23:59:59`);
+}
+if (vendedorFiltro) query = query.eq(‘vendedor_id’, vendedorFiltro);
+const { data, error } = await query;
+if (error || !data) { tbody.innerHTML = ‘<tr><td colspan="7"><div class="empty-state"><p>Sin datos</p></div></td></tr>’; return; }
 
-    // Build stats per vendedor
-    const vendedoresMap = {};
-    data.forEach(v => {
-      const id = v.vendedor_id;
-      const nombre = v.vendedor_nombre || 'Vendedor';
-      if (!vendedoresMap[id]) vendedoresMap[id] = { nombre, ventas: 0, total: 0, comision: 0, id };
-      vendedoresMap[id].ventas++;
-      vendedoresMap[id].total += Number(v.total_final || v.total);
-      vendedoresMap[id].comision += Number(v.comision || 0);
-    });
+```
+// Build stats per vendedor
+const vendedoresMap = {};
+data.forEach(v => {
+  const id = v.vendedor_id;
+  const nombre = v.vendedor_nombre || 'Vendedor';
+  if (!vendedoresMap[id]) vendedoresMap[id] = { nombre, ventas: 0, total: 0, comision: 0, id };
+  vendedoresMap[id].ventas++;
+  vendedoresMap[id].total += Number(v.total_final || v.total);
+  vendedoresMap[id].comision += Number(v.comision || 0);
+});
 
-    // Render stats cards
-    const vendedores = Object.values(vendedoresMap);
-    if (statsDiv) {
-      statsDiv.innerHTML = `<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
-        ${vendedores.map(v => `
-          <div class="stat-card">
-            <div class="stat-label">${v.nombre}</div>
-            <div class="stat-value">$${v.total.toFixed(0)}</div>
-            <div class="stat-sub">${v.ventas} ventas · Comisión: <strong style="color:#4CAF7C">$${v.comision.toFixed(0)}</strong></div>
-          </div>`).join('')}
-      </div>`;
-      // Populate vendedor filter
-      const sel = document.getElementById('vv-filtro-vendedor');
-      if (sel && sel.options.length <= 1) {
-        vendedores.forEach(v => sel.innerHTML += `<option value="${v.id}">${v.nombre}</option>`);
-      }
-    }
-
-    if (!data.length) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><span class="icon">👥</span><p>Sin ventas en este período</p></div></td></tr>'; return; }
-
-    tbody.innerHTML = data.map(v => {
-      const cl = clientes.find(c => c.id == v.cliente_id);
-      const totalV = Number(v.total_final || v.total);
-      const comisionV = Number(v.comision || totalV * 0.10);
-      return `<tr>
-        <td style="font-size:.75rem;white-space:nowrap">${new Date(v.fecha).toLocaleDateString('es-MX')}</td>
-        <td><strong>${v.vendedor_nombre || '—'}</strong></td>
-        <td>${cl ? cl.nombre : 'Sin cliente'}</td>
-        <td class="price">$${totalV.toFixed(2)}</td>
-        <td><span class="badge badge-gold">${v.tipo}</span></td>
-        <td style="color:#4CAF7C;font-weight:600">$${comisionV.toFixed(2)}</td>
-        <td><button class="btn btn-outline btn-sm" onclick="reimprimirComprobante(${v.id})">🧾</button></td>
-      </tr>`;
-    }).join('');
-  } catch(e) {
-    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><p>Error cargando datos</p></div></td></tr>';
+// Render stats cards
+const vendedores = Object.values(vendedoresMap);
+if (statsDiv) {
+  statsDiv.innerHTML = `<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
+    ${vendedores.map(v => `
+      <div class="stat-card">
+        <div class="stat-label">${v.nombre}</div>
+        <div class="stat-value">$${v.total.toFixed(0)}</div>
+        <div class="stat-sub">${v.ventas} ventas · Comisión: <strong style="color:#4CAF7C">$${v.comision.toFixed(0)}</strong></div>
+      </div>`).join('')}
+  </div>`;
+  // Populate vendedor filter
+  const sel = document.getElementById('vv-filtro-vendedor');
+  if (sel && sel.options.length <= 1) {
+    vendedores.forEach(v => sel.innerHTML += `<option value="${v.id}">${v.nombre}</option>`);
   }
 }
 
+if (!data.length) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><span class="icon">👥</span><p>Sin ventas en este período</p></div></td></tr>'; return; }
+
+tbody.innerHTML = data.map(v => {
+  const cl = clientes.find(c => c.id == v.cliente_id);
+  const totalV = Number(v.total_final || v.total);
+  const comisionV = Number(v.comision || totalV * 0.10);
+  return `<tr>
+    <td style="font-size:.75rem;white-space:nowrap">${new Date(v.fecha).toLocaleDateString('es-MX')}</td>
+    <td><strong>${v.vendedor_nombre || '—'}</strong></td>
+    <td>${cl ? cl.nombre : 'Sin cliente'}</td>
+    <td class="price">$${totalV.toFixed(2)}</td>
+    <td><span class="badge badge-gold">${v.tipo}</span></td>
+    <td style="color:#4CAF7C;font-weight:600">$${comisionV.toFixed(2)}</td>
+    <td><button class="btn btn-outline btn-sm" onclick="reimprimirComprobante(${v.id})">🧾</button></td>
+  </tr>`;
+}).join('');
+```
+
+} catch(e) {
+tbody.innerHTML = ‘<tr><td colspan="7"><div class="empty-state"><p>Error cargando datos</p></div></td></tr>’;
+}
+}
+
 async function reimprimirComprobante(ventaId) {
-  const { data: v } = await db.from('bs_ventas').select('*, bs_ventas_detalle(*, bs_perfumes(nombre, precio_venta))').eq('id', ventaId).single();
-  if (!v) { toast('No se encontró la venta', 'error'); return; }
-  const items = (v.bs_ventas_detalle || []).map(d => ({ nombre: d.bs_perfumes?.nombre || 'Producto', precio: Number(d.precio_unitario), qty: d.cantidad }));
-  const r = {
-    tipo: v.tipo,
-    subtotal: Number(v.total),
-    totalFinal: Number(v.total_final || v.total),
-    descuento: Number(v.descuento || 0),
-    anticipo: Number(v.anticipo || 0),
-    interes: Number(v.total_final || v.total) - Number(v.total) + Number(v.descuento || 0),
-    semanas: v.semanas || 4
-  };
-  generarComprobante(v, items, r);
+const { data: v } = await db.from(‘bs_ventas’).select(’*, bs_ventas_detalle(*, bs_perfumes(nombre, precio_venta))’).eq(‘id’, ventaId).single();
+if (!v) { toast(‘No se encontró la venta’, ‘error’); return; }
+const items = (v.bs_ventas_detalle || []).map(d => ({ nombre: d.bs_perfumes?.nombre || ‘Producto’, precio: Number(d.precio_unitario), qty: d.cantidad }));
+const r = {
+tipo: v.tipo,
+subtotal: Number(v.total),
+totalFinal: Number(v.total_final || v.total),
+descuento: Number(v.descuento || 0),
+anticipo: Number(v.anticipo || 0),
+interes: Number(v.total_final || v.total) - Number(v.total) + Number(v.descuento || 0),
+semanas: v.semanas || 4
+};
+generarComprobante(v, items, r);
 }
 
 // ===================== LOG =====================
 async function registrarLog(accion, tabla, descripcion, datos={}) {
-  if (!currentUser) return;
-  await db.from('bs_log').insert({
-    usuario_id: currentUser.id,
-    usuario_nombre: currentUser.user_metadata?.nombre || currentUser.email,
-    accion, tabla, descripcion,
-    datos: datos || {}
-  });
+if (!currentUser) return;
+await db.from(‘bs_log’).insert({
+usuario_id: currentUser.id,
+usuario_nombre: currentUser.user_metadata?.nombre || currentUser.email,
+accion, tabla, descripcion,
+datos: datos || {}
+});
 }
 
-let filtroLog = 'all';
+let filtroLog = ‘all’;
 async function renderLog() {
-  const tbody = document.getElementById('tabla-log');
-  if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="5"><div class="loading"><div class="spinner"></div>Cargando...</div></td></tr>';
-  try {
-  let query = db.from('bs_log').select('*').order('fecha', { ascending: false }).limit(200);
-  if (filtroLog !== 'all') query = query.eq('accion', filtroLog);
-  const { data, error } = await query;
-  if (error || !data || !data.length) { tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><span class="icon">📋</span><p>Sin registros aún</p></div></td></tr>'; return; }
-  const accionBadge = { crear:'badge-green', editar:'badge-yellow', eliminar:'badge-red', venta:'badge-gold', pago:'badge-green', login:'badge-gold' };
-  tbody.innerHTML = data.map(r => `<tr>
-    <td style="font-size:.72rem;white-space:nowrap">${new Date(r.fecha).toLocaleString('es-MX',{dateStyle:'short',timeStyle:'short'})}</td>
-    <td><strong>${r.usuario_nombre||'—'}</strong></td>
-    <td><span class="badge ${accionBadge[r.accion]||'badge-gold'}">${r.accion}</span></td>
-    <td style="color:var(--text-muted);font-size:.75rem">${r.tabla||'—'}</td>
-    <td style="font-size:.78rem">${r.descripcion||'—'}</td>
+const tbody = document.getElementById(‘tabla-log’);
+if (!tbody) return;
+tbody.innerHTML = ‘<tr><td colspan="5"><div class="loading"><div class="spinner"></div>Cargando…</div></td></tr>’;
+try {
+let query = db.from(‘bs_log’).select(’*’).order(‘fecha’, { ascending: false }).limit(200);
+if (filtroLog !== ‘all’) query = query.eq(‘accion’, filtroLog);
+const { data, error } = await query;
+if (error || !data || !data.length) { tbody.innerHTML = ‘<tr><td colspan="5"><div class="empty-state"><span class="icon">📋</span><p>Sin registros aún</p></div></td></tr>’; return; }
+const accionBadge = { crear:‘badge-green’, editar:‘badge-yellow’, eliminar:‘badge-red’, venta:‘badge-gold’, pago:‘badge-green’, login:‘badge-gold’ };
+tbody.innerHTML = data.map(r => `<tr>
+<td style="font-size:.72rem;white-space:nowrap">${new Date(r.fecha).toLocaleString(‘es-MX’,{dateStyle:‘short’,timeStyle:‘short’})}</td>
+<td><strong>${r.usuario_nombre||’—’}</strong></td>
+<td><span class="badge ${accionBadge[r.accion]||'badge-gold'}">${r.accion}</span></td>
+<td style="color:var(--text-muted);font-size:.75rem">${r.tabla||’—’}</td>
+<td style="font-size:.78rem">${r.descripcion||’—’}</td>
+
   </tr>`).join('');
   } catch(e) { tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><span class="icon">📋</span><p>Sin registros</p></div></td></tr>'; }
 }
@@ -2149,15 +2187,16 @@ function filtrarLog(f, btn) {
 
 // ===================== INIT =====================
 (async () => {
-  // Check existing session
-  const { data: { session } } = await db.auth.getSession();
-  if (session) {
-    currentUser = session.user;
-    currentUserRol = session.user.user_metadata?.rol || 'vendedor';
-    iniciarApp();
-  }
-  // else login screen is shown by default
+// Check existing session
+const { data: { session } } = await db.auth.getSession();
+if (session) {
+currentUser = session.user;
+currentUserRol = session.user.user_metadata?.rol || ‘vendedor’;
+iniciarApp();
+}
+// else login screen is shown by default
 })();
 </script>
+
 </body>
 </html>
