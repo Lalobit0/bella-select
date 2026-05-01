@@ -250,6 +250,7 @@
       <div class="nav-item" onclick="navigate('apartados',this)"><span class="nav-icon">◑</span> Apartados <span class="nav-badge" id="badge-apartados" style="display:none"></span></div>
       <div class="nav-item" onclick="navigate('creditos',this)"><span class="nav-icon">◐</span> Créditos <span class="nav-badge" id="badge-creditos" style="display:none"></span></div>
       <div class="nav-item" id="nav-log" style="display:none" onclick="navigate('log',this)"><span class="nav-icon">📋</span> Log Admin</div>
+      <div class="nav-item" id="nav-ventas-vendedores" style="display:none" onclick="navigate('ventas-vendedores',this)"><span class="nav-icon">👥</span> Ventas Vendedores</div>
       <div class="nav-section">Electrónicos</div>
       <div class="nav-item" onclick="navigate('elec-catalogo',this)"><span class="nav-icon">📺</span> Catálogo</div>
       <div class="nav-item" onclick="navigate('elec-venta',this)"><span class="nav-icon">🛒</span> Venta Electrónico</div>
@@ -482,6 +483,33 @@
           <div class="table-header"><div class="table-title">Historial de Mis Ventas</div></div>
           <table><thead><tr><th>Fecha</th><th>Productos</th><th>Total</th><th>Tipo</th><th>Comisión</th></tr></thead>
           <tbody id="tabla-mis-ventas"><tr><td colspan="5"><div class="loading"><div class="spinner"></div>Cargando...</div></td></tr></tbody></table>
+        </div>
+      </div>
+
+      <!-- VENTAS VENDEDORES (admin) -->
+      <div class="page" id="page-ventas-vendedores">
+        <div class="section-header">
+          <div><div class="gold-line"></div><div class="section-title">Ventas por Vendedor</div></div>
+          <button class="btn btn-outline btn-sm" onclick="renderVentasVendedores()">↻ Actualizar</button>
+        </div>
+        <!-- Stats por vendedor -->
+        <div id="vv-stats" style="margin-bottom:20px"></div>
+        <!-- Filtros -->
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+          <div class="form-group" style="margin:0">
+            <select id="vv-filtro-vendedor" onchange="renderVentasVendedores()" style="width:180px">
+              <option value="">Todos los vendedores</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0">
+            <input type="month" id="vv-filtro-mes" onchange="renderVentasVendedores()" style="width:160px">
+          </div>
+        </div>
+        <!-- Tabla -->
+        <div class="table-card">
+          <div class="table-header"><div class="table-title">Detalle de Ventas</div></div>
+          <table><thead><tr><th>Fecha</th><th>Vendedor</th><th>Cliente</th><th>Total</th><th>Tipo</th><th>Comisión</th><th>Comprobante</th></tr></thead>
+          <tbody id="tabla-ventas-vendedores"><tr><td colspan="7"><div class="loading"><div class="spinner"></div>Cargando...</div></td></tr></tbody></table>
         </div>
       </div>
 
@@ -1805,8 +1833,16 @@ function iniciarApp() {
   // Mostrar Log solo a admin, mis-ventas solo a vendedor
   const navLog = document.getElementById('nav-log');
   const navMisVentas = document.getElementById('nav-mis-ventas');
-  if (currentUserRol === 'admin') { navLog.style.display = ''; if(navMisVentas) navMisVentas.style.display = 'none'; }
-  else { navLog.style.display = 'none'; if(navMisVentas) navMisVentas.style.display = ''; }
+  const navVV = document.getElementById('nav-ventas-vendedores');
+  if (currentUserRol === 'admin') {
+    navLog.style.display = '';
+    if (navMisVentas) navMisVentas.style.display = 'none';
+    if (navVV) navVV.style.display = '';
+  } else {
+    navLog.style.display = 'none';
+    if (navMisVentas) navMisVentas.style.display = '';
+    if (navVV) navVV.style.display = 'none';
+  }
   // Aplicar restricciones de rol al DOM después de render
   applyRoleRestrictions();
   registrarLog('login', null, 'Acceso al sistema', {email: currentUser.email});
@@ -1834,6 +1870,9 @@ async function cerrarSesion() {
 
 async function loadAll() {
   await Promise.all([loadMarcas(), loadPerfumes(), loadClientes(), loadVentas(), loadCategoriasElec()]);
+  // Set default month to current
+  const mesInput = document.getElementById('vv-filtro-mes');
+  if (mesInput) { const now = new Date(); mesInput.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`; }
   renderDashboard();
   updateBadges();
 }
@@ -1923,6 +1962,93 @@ function generarComprobante(venta, items, r) {
   win.document.write(html);
   win.document.close();
   setTimeout(() => win.print(), 500);
+}
+
+// ===================== VENTAS VENDEDORES (admin) =====================
+async function renderVentasVendedores() {
+  const tbody = document.getElementById('tabla-ventas-vendedores');
+  const statsDiv = document.getElementById('vv-stats');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="7"><div class="loading"><div class="spinner"></div>Cargando...</div></td></tr>';
+  try {
+    // Build query
+    const mesInput = document.getElementById('vv-filtro-mes')?.value;
+    const vendedorFiltro = document.getElementById('vv-filtro-vendedor')?.value;
+    let query = db.from('bs_ventas').select('*').not('vendedor_id', 'is', null).order('fecha', { ascending: false }).limit(300);
+    if (mesInput) {
+      const [y, m] = mesInput.split('-');
+      const desde = `${y}-${m}-01T00:00:00`;
+      const hasta = new Date(y, m, 0);
+      query = query.gte('fecha', desde).lte('fecha', `${y}-${m}-${String(hasta.getDate()).padStart(2,'0')}T23:59:59`);
+    }
+    if (vendedorFiltro) query = query.eq('vendedor_id', vendedorFiltro);
+    const { data, error } = await query;
+    if (error || !data) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><p>Sin datos</p></div></td></tr>'; return; }
+
+    // Build stats per vendedor
+    const vendedoresMap = {};
+    data.forEach(v => {
+      const id = v.vendedor_id;
+      const nombre = v.vendedor_nombre || 'Vendedor';
+      if (!vendedoresMap[id]) vendedoresMap[id] = { nombre, ventas: 0, total: 0, comision: 0, id };
+      vendedoresMap[id].ventas++;
+      vendedoresMap[id].total += Number(v.total_final || v.total);
+      vendedoresMap[id].comision += Number(v.comision || 0);
+    });
+
+    // Render stats cards
+    const vendedores = Object.values(vendedoresMap);
+    if (statsDiv) {
+      statsDiv.innerHTML = `<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
+        ${vendedores.map(v => `
+          <div class="stat-card">
+            <div class="stat-label">${v.nombre}</div>
+            <div class="stat-value">$${v.total.toFixed(0)}</div>
+            <div class="stat-sub">${v.ventas} ventas · Comisión: <strong style="color:#4CAF7C">$${v.comision.toFixed(0)}</strong></div>
+          </div>`).join('')}
+      </div>`;
+      // Populate vendedor filter
+      const sel = document.getElementById('vv-filtro-vendedor');
+      if (sel && sel.options.length <= 1) {
+        vendedores.forEach(v => sel.innerHTML += `<option value="${v.id}">${v.nombre}</option>`);
+      }
+    }
+
+    if (!data.length) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><span class="icon">👥</span><p>Sin ventas en este período</p></div></td></tr>'; return; }
+
+    tbody.innerHTML = data.map(v => {
+      const cl = clientes.find(c => c.id == v.cliente_id);
+      const totalV = Number(v.total_final || v.total);
+      const comisionV = Number(v.comision || totalV * 0.10);
+      return `<tr>
+        <td style="font-size:.75rem;white-space:nowrap">${new Date(v.fecha).toLocaleDateString('es-MX')}</td>
+        <td><strong>${v.vendedor_nombre || '—'}</strong></td>
+        <td>${cl ? cl.nombre : 'Sin cliente'}</td>
+        <td class="price">$${totalV.toFixed(2)}</td>
+        <td><span class="badge badge-gold">${v.tipo}</span></td>
+        <td style="color:#4CAF7C;font-weight:600">$${comisionV.toFixed(2)}</td>
+        <td><button class="btn btn-outline btn-sm" onclick="reimprimirComprobante(${v.id})">🧾</button></td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><p>Error cargando datos</p></div></td></tr>';
+  }
+}
+
+async function reimprimirComprobante(ventaId) {
+  const { data: v } = await db.from('bs_ventas').select('*, bs_ventas_detalle(*, bs_perfumes(nombre, precio_venta))').eq('id', ventaId).single();
+  if (!v) { toast('No se encontró la venta', 'error'); return; }
+  const items = (v.bs_ventas_detalle || []).map(d => ({ nombre: d.bs_perfumes?.nombre || 'Producto', precio: Number(d.precio_unitario), qty: d.cantidad }));
+  const r = {
+    tipo: v.tipo,
+    subtotal: Number(v.total),
+    totalFinal: Number(v.total_final || v.total),
+    descuento: Number(v.descuento || 0),
+    anticipo: Number(v.anticipo || 0),
+    interes: Number(v.total_final || v.total) - Number(v.total) + Number(v.descuento || 0),
+    semanas: v.semanas || 4
+  };
+  generarComprobante(v, items, r);
 }
 
 // ===================== LOG =====================
