@@ -793,7 +793,14 @@
 const SUPABASE_URL = 'https://ivpxysaqjuwfpwexurfj.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2cHh5c2FxanV3ZnB3ZXh1cmZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNzg2MTksImV4cCI6MjA5MDY1NDYxOX0.U6WdqD_OCdAWGaN4lR3TlEYHCO3AxTQDk-wtRSdW3WY';
 const { createClient } = supabase;
-const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+const db = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false,
+    flowType: 'implicit'
+  }
+});
 
 // ===================== STATE =====================
 let marcas = [];
@@ -1907,7 +1914,11 @@ async function doLogin() {
   if (!usuarioInput || !pass) { errEl.textContent = 'Ingresa usuario y contraseña'; return; }
   btn.disabled = true; btn.textContent = 'Entrando...';
   errEl.textContent = '';
-  const { data, error } = await db.auth.signInWithPassword({ email, password: pass });
+  const { data, error } = await db.auth.signInWithPassword({ 
+    email, 
+    password: pass,
+    options: { redirectTo: window.location.origin }
+  });
   btn.disabled = false; btn.textContent = 'Entrar';
   if (error) { errEl.textContent = 'Usuario o contraseña incorrectos'; return; }
   currentUser = data.user;
