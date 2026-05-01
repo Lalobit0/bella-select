@@ -237,12 +237,12 @@
     </div>
     <div class="nav">
       <div class="nav-section">Principal</div>
-      <div class="nav-item active" onclick="navigate('dashboard',this)"><span class="nav-icon">◈</span> Dashboard</div>
+      <div class="nav-item" onclick="navigate('dashboard',this)"><span class="nav-icon">◈</span> Dashboard</div>
       <div class="nav-section">Inventario</div>
       <div class="nav-item" onclick="navigate('inventario',this)"><span class="nav-icon">✦</span> Catálogo</div>
       <div class="nav-item" onclick="navigate('marcas',this)"><span class="nav-icon">◇</span> Marcas</div>
       <div class="nav-section">Operaciones</div>
-      <div class="nav-item" onclick="navigate('ventas',this)"><span class="nav-icon">◉</span> Nueva Venta</div>
+      <div class="nav-item active" onclick="navigate('ventas',this)"><span class="nav-icon">◉</span> Nueva Venta</div>
       <div class="nav-item" onclick="navigate('historial',this)"><span class="nav-icon">◎</span> Historial</div>
       <div class="nav-section">Clientes</div>
       <div class="nav-item" onclick="navigate('clientes',this)"><span class="nav-icon">⬡</span> Clientes</div>
@@ -267,14 +267,14 @@
     <div class="topbar">
       <div style="display:flex;align-items:center;gap:12px">
         <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
-        <div class="page-title" id="pageTitle">Dashboard</div>
+        <div class="page-title" id="pageTitle">Nueva Venta</div>
       </div>
       <button class="btn btn-gold" onclick="openQuickAdd()">+ Agregar</button>
     </div>
     <div class="content">
 
       <!-- DASHBOARD -->
-      <div class="page active" id="page-dashboard">
+      <div class="page" id="page-dashboard">
         <div class="stats-grid">
           <div class="stat-card"><div class="stat-label">Productos</div><div class="stat-value" id="stat-productos">—</div><div class="stat-sub">en catálogo</div></div>
           <div class="stat-card"><div class="stat-label">Ventas Hoy</div><div class="stat-value" id="stat-ventas-hoy">$0</div><div class="stat-sub">contado</div></div>
@@ -337,7 +337,7 @@
       </div>
 
       <!-- VENTAS -->
-      <div class="page" id="page-ventas">
+      <div class="page active" id="page-ventas">
         <div class="section-header"><div><div class="gold-line"></div><div class="section-title">Nueva Venta</div></div></div>
         <div class="venta-layout">
           <div>
@@ -385,8 +385,12 @@
                   </select>
                 </div>
               </div>
-              <div class="form-group" style="margin-bottom:10px"><label>Cliente</label>
-                <select id="venta-cliente"><option value="">Sin cliente</option></select>
+              <div class="form-group" style="margin-bottom:10px">
+                <label>Cliente</label>
+                <div style="display:flex;gap:6px">
+                  <select id="venta-cliente" style="flex:1"><option value="">Sin cliente</option></select>
+                  <button class="btn btn-outline btn-sm" onclick="openModalClienteRapido()" title="Nuevo cliente" style="flex-shrink:0">+</button>
+                </div>
               </div>
               <button class="btn btn-gold" style="width:100%" onclick="finalizarVenta()">Finalizar Venta</button>
             </div>
@@ -688,6 +692,28 @@
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-credito')">Cancelar</button>
       <button class="btn btn-gold" onclick="guardarCredito()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CLIENTE RÁPIDO -->
+<div class="modal-overlay" id="modal-cliente-rapido">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title">Nuevo Cliente Rápido</div>
+      <button class="modal-close" onclick="closeModal('modal-cliente-rapido')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full"><label>Nombre Completo *</label><input type="text" id="cr-nombre" placeholder="Nombre del cliente"></div>
+        <div class="form-group"><label>Teléfono</label><input type="tel" id="cr-tel" placeholder="664 000 0000"></div>
+        <div class="form-group"><label>Correo</label><input type="email" id="cr-correo2" placeholder="correo@ejemplo.com"></div>
+        <div class="form-group full"><label>Notas</label><input type="text" id="cr-notas2" placeholder="Preferencias, referencia..."></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-cliente-rapido')">Cancelar</button>
+      <button class="btn btn-gold" onclick="guardarClienteRapido()">Guardar y Seleccionar</button>
     </div>
   </div>
 </div>
@@ -1070,6 +1096,37 @@ async function eliminarMarca(id) {
   if (!confirm('¿Eliminar esta marca?')) return;
   await db.from('bs_marcas').delete().eq('id', id);
   await loadMarcas(); renderMarcas();
+}
+
+// ===================== CLIENTE RÁPIDO =====================
+function openModalClienteRapido() {
+  ['cr-nombre','cr-tel','cr-correo2','cr-notas2'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  openModal('modal-cliente-rapido');
+}
+
+async function guardarClienteRapido() {
+  const nombre = document.getElementById('cr-nombre').value.trim();
+  if (!nombre) { toast('Nombre requerido', 'error'); return; }
+  const { data, error } = await db.from('bs_clientes').insert({
+    nombre,
+    telefono: document.getElementById('cr-tel').value,
+    correo: document.getElementById('cr-correo2').value,
+    notas: document.getElementById('cr-notas2').value
+  }).select().single();
+  if (error) { toast('Error al guardar', 'error'); return; }
+  // Reload clientes and select the new one
+  await loadClientes();
+  // Update both dropdowns
+  const selVenta = document.getElementById('venta-cliente');
+  const selElec = document.getElementById('elec-venta-cliente');
+  [selVenta, selElec].forEach(sel => {
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Sin cliente</option>';
+    clientes.forEach(c => sel.innerHTML += `<option value="${c.id}" ${c.id === data.id ? 'selected' : ''}>${c.nombre}</option>`);
+  });
+  closeModal('modal-cliente-rapido');
+  registrarLog('crear', 'clientes', `Nuevo cliente rápido: ${nombre}`, {nombre});
+  toast(`✓ ${nombre} registrado y seleccionado`, 'success');
 }
 
 // ===================== VENTAS =====================
@@ -1873,7 +1930,8 @@ async function loadAll() {
   // Set default month to current
   const mesInput = document.getElementById('vv-filtro-mes');
   if (mesInput) { const now = new Date(); mesInput.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`; }
-  renderDashboard();
+  // Start on ventas page
+  renderVentaPage();
   updateBadges();
 }
 
