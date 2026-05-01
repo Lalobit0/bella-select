@@ -1898,33 +1898,45 @@ let currentUser = null;
 let currentUserRol = 'vendedor';
 
 async function doLogin() {
+  const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn');
   const usuarioInput = document.getElementById('login-usuario').value.trim().toLowerCase();
-  // Mapa interno — no se muestra al usuario
+  const pass = document.getElementById('login-pass').value;
+  if (!usuarioInput || !pass) { errEl.textContent = 'Ingresa usuario y contraseña'; return; }
   const usuarioMap = {
     'admin': 'admin@bellaselect.com',
     'angelica': 'angelica@bellaselect.com',
-    'angélica': 'angelica@bellaselect.com',
-    'angelica ': 'angelica@bellaselect.com'
+    'angélica': 'angelica@bellaselect.com'
   };
   const email = usuarioMap[usuarioInput];
-  if (!email) { errEl.textContent = 'Usuario no reconocido'; btn.disabled=false; btn.textContent='Entrar'; return; }
-  const pass = document.getElementById('login-pass').value;
-  const errEl = document.getElementById('login-error');
-  const btn = document.getElementById('login-btn');
-  if (!usuarioInput || !pass) { errEl.textContent = 'Ingresa usuario y contraseña'; return; }
+  if (!email) { errEl.textContent = 'Usuario no reconocido'; return; }
   btn.disabled = true; btn.textContent = 'Entrando...';
   errEl.textContent = '';
-  const { data, error } = await db.auth.signInWithPassword({ 
-    email, 
-    password: pass,
-    options: { redirectTo: window.location.origin }
-  });
-  btn.disabled = false; btn.textContent = 'Entrar';
-  if (error) { errEl.textContent = 'Usuario o contraseña incorrectos'; return; }
-  currentUser = data.user;
-  currentUserRol = data.user.user_metadata?.rol || 'vendedor';
-  iniciarApp();
+  try {
+    // Llamada directa REST — no depende del Site URL de Supabase
+    const res = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY },
+      body: JSON.stringify({ email, password: pass })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      btn.disabled = false; btn.textContent = 'Entrar';
+      errEl.textContent = 'Usuario o contraseña incorrectos';
+      return;
+    }
+    await db.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
+    const { data: { user } } = await db.auth.getUser();
+    currentUser = user;
+    currentUserRol = user?.user_metadata?.rol || 'vendedor';
+    btn.disabled = false; btn.textContent = 'Entrar';
+    iniciarApp();
+  } catch(e) {
+    btn.disabled = false; btn.textContent = 'Entrar';
+    errEl.textContent = 'Error de conexión';
+  }
 }
+
 
 function iniciarApp() {
   document.getElementById('login-screen').style.display = 'none';
