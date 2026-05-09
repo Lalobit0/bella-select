@@ -886,9 +886,13 @@ async function toggleScanner() {
   const video = document.getElementById('scanner-video');
   const status = document.getElementById('scanner-status');
   if (scannerStream) { stopScanner(); status.textContent = ''; return; }
-  video.style.display = 'block';
-  status.textContent = 'Iniciando cámara...';
+  status.textContent = 'Solicitando permiso de cámara...';
   try {
+    // Pedir permiso explícitamente primero
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    stream.getTracks().forEach(t => t.stop()); // solo pedimos permiso, ZXing manejará el stream
+    video.style.display = 'block';
+    status.textContent = 'Iniciando escáner...';
     if (!zxingReader) zxingReader = new ZXing.BrowserMultiFormatReader();
     const devices = await ZXing.BrowserMultiFormatReader.listVideoInputDevices();
     const backCam = devices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('trasera') || d.label.toLowerCase().includes('environment')) || devices[devices.length - 1];
@@ -902,11 +906,17 @@ async function toggleScanner() {
       }
     });
     scannerStream = true;
-    status.textContent = 'Apunta al código de barras...';
+    status.textContent = '📷 Apunta al código de barras...';
   } catch(e) {
     video.style.display = 'none';
-    status.textContent = 'No se pudo acceder a la cámara';
-    toast('Permiso de cámara denegado', 'error');
+    if (e.name === 'NotAllowedError') {
+      status.textContent = '⚠️ Permiso denegado — actívalo en Ajustes del navegador';
+      toast('Ve a Ajustes del navegador y permite el acceso a la cámara', 'error');
+    } else if (e.name === 'NotFoundError') {
+      status.textContent = '⚠️ No se encontró cámara en este dispositivo';
+    } else {
+      status.textContent = '⚠️ Error: ' + e.message;
+    }
   }
 }
 function stopScanner() {
@@ -1844,9 +1854,12 @@ async function toggleElecScanner() {
   const video = document.getElementById('elec-scanner-video');
   const status = document.getElementById('elec-scanner-status');
   if (elecScannerStream) { stopElecScanner(); status.textContent = ''; return; }
-  video.style.display = 'block';
-  status.textContent = 'Iniciando cámara...';
+  status.textContent = 'Solicitando permiso de cámara...';
   try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    stream.getTracks().forEach(t => t.stop());
+    video.style.display = 'block';
+    status.textContent = 'Iniciando escáner...';
     if (!zxingReaderElec) zxingReaderElec = new ZXing.BrowserMultiFormatReader();
     const devices = await ZXing.BrowserMultiFormatReader.listVideoInputDevices();
     const backCam = devices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('trasera') || d.label.toLowerCase().includes('environment')) || devices[devices.length - 1];
@@ -1860,10 +1873,15 @@ async function toggleElecScanner() {
       }
     });
     elecScannerStream = true;
-    status.textContent = 'Apunta al código de barras...';
+    status.textContent = '📷 Apunta al código de barras...';
   } catch(e) {
     video.style.display = 'none';
-    toast('Permiso de cámara denegado', 'error');
+    if (e.name === 'NotAllowedError') {
+      status.textContent = '⚠️ Permiso denegado — actívalo en Ajustes del navegador';
+      toast('Ve a Ajustes del navegador y permite el acceso a la cámara', 'error');
+    } else {
+      status.textContent = '⚠️ Error: ' + e.message;
+    }
   }
 }
 function stopElecScanner() {
