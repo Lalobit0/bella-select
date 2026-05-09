@@ -346,7 +346,8 @@
               <div style="margin-bottom:10px;color:var(--text-dim);font-size:.8rem"><strong style="color:var(--gold)">📷 Escanear código de barras</strong></div>
               <video id="scanner-video" playsinline></video>
               <div id="scanner-status" style="font-size:.75rem;color:var(--text-muted);margin:6px 0"></div>
-              <button class="btn btn-outline btn-sm" onclick="toggleScanner()">📷 Abrir cámara</button>
+              <button class="btn btn-outline btn-sm" onclick="toggleScanner()">📷 Escanear con cámara</button>
+              <input type="file" id="scanner-file-input" accept="image/*" capture="environment" style="display:none" onchange="handleScannerFile(this)">
               <span style="color:var(--text-muted);font-size:.7rem;margin:0 8px">ó</span>
               <input type="text" id="barcode-input" placeholder="Código manual" style="width:150px;display:inline-block" onkeydown="if(event.key==='Enter')buscarBarcode()">
             </div>
@@ -541,7 +542,8 @@
               <div style="margin-bottom:10px;color:var(--text-dim);font-size:.8rem"><strong style="color:var(--gold)">📷 Escanear código</strong></div>
               <video id="elec-scanner-video" playsinline style="display:none;width:100%;max-width:300px;border-radius:8px"></video>
               <div id="elec-scanner-status" style="font-size:.75rem;color:var(--text-muted);margin:6px 0"></div>
-              <button class="btn btn-outline btn-sm" onclick="toggleElecScanner()">📷 Abrir cámara</button>
+              <button class="btn btn-outline btn-sm" onclick="toggleElecScanner()">📷 Escanear con cámara</button>
+              <input type="file" id="elec-scanner-file-input" accept="image/*" capture="environment" style="display:none" onchange="handleElecScannerFile(this)">
               <span style="color:var(--text-muted);font-size:.7rem;margin:0 8px">ó</span>
               <input type="text" id="elec-barcode-input" placeholder="Código manual" style="width:150px;display:inline-block" onkeydown="if(event.key==='Enter')buscarElecBarcode()">
             </div>
@@ -882,48 +884,34 @@ function handlePhoto(input) {
 // ===================== SCANNER =====================
 let zxingReader = null;
 
-async function toggleScanner() {
-  const video = document.getElementById('scanner-video');
-  const status = document.getElementById('scanner-status');
-  if (scannerStream) { stopScanner(); status.textContent = ''; return; }
-  status.textContent = 'Solicitando permiso de cámara...';
-  try {
-    // Pedir permiso explícitamente primero
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-    stream.getTracks().forEach(t => t.stop()); // solo pedimos permiso, ZXing manejará el stream
-    video.style.display = 'block';
-    status.textContent = 'Iniciando escáner...';
-    if (!zxingReader) zxingReader = new ZXing.BrowserMultiFormatReader();
-    const devices = await ZXing.BrowserMultiFormatReader.listVideoInputDevices();
-    const backCam = devices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('trasera') || d.label.toLowerCase().includes('environment')) || devices[devices.length - 1];
-    await zxingReader.decodeFromVideoDevice(backCam?.deviceId, video, (result, err) => {
-      if (result) {
-        const code = result.getText();
-        document.getElementById('barcode-input').value = code;
-        status.textContent = '✓ Código: ' + code;
-        stopScanner();
-        buscarBarcode();
-      }
-    });
-    scannerStream = true;
-    status.textContent = '📷 Apunta al código de barras...';
-  } catch(e) {
-    video.style.display = 'none';
-    if (e.name === 'NotAllowedError') {
-      status.textContent = '⚠️ Permiso denegado — actívalo en Ajustes del navegador';
-      toast('Ve a Ajustes del navegador y permite el acceso a la cámara', 'error');
-    } else if (e.name === 'NotFoundError') {
-      status.textContent = '⚠️ No se encontró cámara en este dispositivo';
-    } else {
-      status.textContent = '⚠️ Error: ' + e.message;
-    }
-  }
+function toggleScanner() {
+  // Usar input file con capture=environment — funciona en iOS y Android
+  const input = document.getElementById('scanner-file-input');
+  if (input) input.click();
 }
 function stopScanner() {
-  if (zxingReader) { try { zxingReader.reset(); } catch(e) {} }
   scannerStream = null;
-  const video = document.getElementById('scanner-video');
-  if (video) { video.style.display = 'none'; video.srcObject = null; }
+}
+async function handleScannerFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const status = document.getElementById('scanner-status');
+  status.textContent = 'Procesando imagen...';
+  try {
+    const { BrowserMultiFormatReader } = ZXing;
+    const reader = new BrowserMultiFormatReader();
+    const img = document.createElement('img');
+    img.src = URL.createObjectURL(file);
+    await new Promise(r => img.onload = r);
+    const result = await reader.decodeFromImageElement(img);
+    const code = result.getText();
+    document.getElementById('barcode-input').value = code;
+    status.textContent = '✓ Código: ' + code;
+    buscarBarcode();
+  } catch(e) {
+    status.textContent = 'No se detectó código — intenta de nuevo más cerca';
+  }
+  input.value = '';
 }
 function buscarBarcode() {
   const code = document.getElementById('barcode-input').value.trim(); if (!code) return;
@@ -1850,45 +1838,33 @@ async function finalizarElecVenta() {
 // Scanner electrónicos
 let zxingReaderElec = null;
 
-async function toggleElecScanner() {
-  const video = document.getElementById('elec-scanner-video');
-  const status = document.getElementById('elec-scanner-status');
-  if (elecScannerStream) { stopElecScanner(); status.textContent = ''; return; }
-  status.textContent = 'Solicitando permiso de cámara...';
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-    stream.getTracks().forEach(t => t.stop());
-    video.style.display = 'block';
-    status.textContent = 'Iniciando escáner...';
-    if (!zxingReaderElec) zxingReaderElec = new ZXing.BrowserMultiFormatReader();
-    const devices = await ZXing.BrowserMultiFormatReader.listVideoInputDevices();
-    const backCam = devices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('trasera') || d.label.toLowerCase().includes('environment')) || devices[devices.length - 1];
-    await zxingReaderElec.decodeFromVideoDevice(backCam?.deviceId, video, (result, err) => {
-      if (result) {
-        const code = result.getText();
-        document.getElementById('elec-barcode-input').value = code;
-        status.textContent = '✓ Código: ' + code;
-        stopElecScanner();
-        buscarElecBarcode();
-      }
-    });
-    elecScannerStream = true;
-    status.textContent = '📷 Apunta al código de barras...';
-  } catch(e) {
-    video.style.display = 'none';
-    if (e.name === 'NotAllowedError') {
-      status.textContent = '⚠️ Permiso denegado — actívalo en Ajustes del navegador';
-      toast('Ve a Ajustes del navegador y permite el acceso a la cámara', 'error');
-    } else {
-      status.textContent = '⚠️ Error: ' + e.message;
-    }
-  }
+function toggleElecScanner() {
+  const input = document.getElementById('elec-scanner-file-input');
+  if (input) input.click();
 }
 function stopElecScanner() {
-  if (zxingReaderElec) { try { zxingReaderElec.reset(); } catch(e) {} }
   elecScannerStream = null;
-  const video = document.getElementById('elec-scanner-video');
-  if (video) video.style.display = 'none';
+}
+async function handleElecScannerFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const status = document.getElementById('elec-scanner-status');
+  status.textContent = 'Procesando imagen...';
+  try {
+    const { BrowserMultiFormatReader } = ZXing;
+    const reader = new BrowserMultiFormatReader();
+    const img = document.createElement('img');
+    img.src = URL.createObjectURL(file);
+    await new Promise(r => img.onload = r);
+    const result = await reader.decodeFromImageElement(img);
+    const code = result.getText();
+    document.getElementById('elec-barcode-input').value = code;
+    status.textContent = '✓ Código: ' + code;
+    buscarElecBarcode();
+  } catch(e) {
+    status.textContent = 'No se detectó código — intenta de nuevo más cerca';
+  }
+  input.value = '';
 }
 function buscarElecBarcode() {
   const code = document.getElementById('elec-barcode-input').value.trim(); if (!code) return;
