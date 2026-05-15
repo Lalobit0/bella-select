@@ -1269,10 +1269,14 @@ async function finalizarVenta() {
       if (p) await db.from('bs_perfumes').update({ stock: Math.max(0, p.stock - item.qty) }).eq('id', item.id);
     }
   }
+  const productosNota = cart.map(i => `${i.nombre} x${i.qty}`).join(', ');
+  const primerPerfumeId = cart.length === 1 ? cart[0].id : null;
   if (r.tipo === 'apartado') {
-    await db.from('bs_apartados').insert({ cliente_id: clienteId, perfume_id: cart[0].id, monto_total: r.subtotal, anticipo: 0, saldo: r.subtotal, estatus: 'activo' });
+    const { data: apData } = await db.from('bs_apartados').insert({ cliente_id: clienteId, perfume_id: primerPerfumeId, monto_total: r.subtotal, anticipo: r.anticipo || 0, saldo: r.subtotal - (r.anticipo || 0), estatus: 'activo', notas: productosNota }).select().single();
+    if (apData && r.anticipo > 0) await db.from('bs_pagos').insert({ tipo_ref: 'apartado', ref_id: apData.id, monto: r.anticipo, metodo: 'efectivo', notas: 'Anticipo inicial' });
   } else if (r.tipo === 'credito') {
-    await db.from('bs_creditos').insert({ cliente_id: clienteId, perfume_id: cart[0].id, monto_total: r.totalFinal, anticipo: r.anticipo, saldo: r.totalFinal - r.anticipo, plazo_semanas: r.semanas, estatus: 'activo' });
+    const { data: crData } = await db.from('bs_creditos').insert({ cliente_id: clienteId, perfume_id: primerPerfumeId, monto_total: r.totalFinal, anticipo: r.anticipo, saldo: r.totalFinal - r.anticipo, plazo_semanas: r.semanas, estatus: 'activo', notas: productosNota }).select().single();
+    if (crData && r.anticipo > 0) await db.from('bs_pagos').insert({ tipo_ref: 'credito', ref_id: crData.id, monto: r.anticipo, metodo: 'efectivo', notas: 'Anticipo inicial' });
   }
   // Registrar comisión si es vendedor
   if (currentUserRol === 'vendedor' && currentUser) {
@@ -1371,9 +1375,9 @@ async function guardarApartado() {
   if (!clienteId || !perfumeId) { toast('Cliente y perfume requeridos', 'error'); return; }
   const total = parseFloat(document.getElementById('ap-total').value) || 0;
   const anticipo = parseFloat(document.getElementById('ap-anticipo').value) || 0;
-  const { error } = await db.from('bs_apartados').insert({ cliente_id: clienteId, perfume_id: perfumeId, monto_total: total, anticipo, saldo: total - anticipo, fecha_limite: document.getElementById('ap-fecha').value || null, notas: document.getElementById('ap-notas').value, estatus: 'activo' });
+  const { data: apData, error } = await db.from('bs_apartados').insert({ cliente_id: clienteId, perfume_id: perfumeId, monto_total: total, anticipo, saldo: total - anticipo, fecha_limite: document.getElementById('ap-fecha').value || null, notas: document.getElementById('ap-notas').value, estatus: 'activo' }).select().single();
   if (error) { toast('Error: ' + error.message, 'error'); return; }
-  if (anticipo > 0) await db.from('bs_pagos').insert({ tipo_ref:'apartado', ref_id: 0, monto: anticipo, metodo:'efectivo', notas:'Anticipo inicial' });
+  if (anticipo > 0 && apData) await db.from('bs_pagos').insert({ tipo_ref:'apartado', ref_id: apData.id, monto: anticipo, metodo:'efectivo', notas:'Anticipo inicial' });
   toast('Apartado registrado', 'success');
   closeModal('modal-apartado');
   renderApartados(); updateBadges(); updateDashStats();
@@ -1396,7 +1400,7 @@ async function renderApartados() {
     return `<div class="table-card" style="margin-bottom:12px"><div style="padding:16px 20px">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
         <div><div style="font-weight:500;font-size:.9rem">${getClienteNombre(a.cliente_id)}</div>
-          <div style="font-size:.75rem;color:var(--text-muted)">${getPerfumeNombre(a.perfume_id)}</div></div>
+          <div style="font-size:.75rem;color:var(--text-muted)">${a.notas || getPerfumeNombre(a.perfume_id)}</div></div>
         <span class="badge ${a.estatus==='activo'?'badge-yellow':'badge-green'}">${a.estatus}</span>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:8px;flex-wrap:wrap;gap:6px">
@@ -1444,7 +1448,7 @@ async function renderCreditos() {
     return `<div class="table-card" style="margin-bottom:12px"><div style="padding:16px 20px">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
         <div><div style="font-weight:500;font-size:.9rem">${getClienteNombre(cr.cliente_id)}</div>
-          <div style="font-size:.75rem;color:var(--text-muted)">${getPerfumeNombre(cr.perfume_id)} · ${cr.plazo_semanas||4} semanas</div></div>
+          <div style="font-size:.75rem;color:var(--text-muted)">${cr.notas || getPerfumeNombre(cr.perfume_id)} · ${cr.plazo_semanas||4} semanas</div></div>
         <span class="badge ${cr.estatus==='activo'?'badge-yellow':'badge-green'}">${cr.estatus}</span>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:8px;flex-wrap:wrap;gap:6px">
@@ -1817,16 +1821,15 @@ async function finalizarElecVenta() {
   if ((tipo === 'apartado' || tipo === 'credito') && !clienteId) { toast('Selecciona un cliente para ' + tipo, 'error'); return; }
   const { data: ventaData, error } = await db.from('bs_ventas').insert({ cliente_id: clienteId, total, tipo, estatus: tipo==='contado'?'completada':tipo, notas:'Electrónico' }).select().single();
   if (error) { toast('Error al guardar', 'error'); return; }
-  if (tipo === 'contado') {
-    for (const item of elecCart) {
-      const e = electronicos.find(x => x.id === item.id);
-      if (e) await db.from('bs_electronicos').update({ stock: Math.max(0, e.stock - item.qty) }).eq('id', item.id);
-    }
+  for (const item of elecCart) {
+    const e = electronicos.find(x => x.id === item.id);
+    if (e) await db.from('bs_electronicos').update({ stock: Math.max(0, e.stock - item.qty) }).eq('id', item.id);
   }
+  const elecNota = 'Electrónico: ' + elecCart.map(x => `${x.nombre} x${x.qty}`).join(', ');
   if (tipo === 'apartado') {
-    await db.from('bs_apartados').insert({ cliente_id: clienteId, perfume_id: null, monto_total: total, anticipo: 0, saldo: total, estatus: 'activo', notas: 'Electrónico: ' + elecCart.map(x=>x.nombre).join(', ') });
+    const { data: apData } = await db.from('bs_apartados').insert({ cliente_id: clienteId, perfume_id: null, monto_total: total, anticipo: 0, saldo: total, estatus: 'activo', notas: elecNota }).select().single();
   } else if (tipo === 'credito') {
-    await db.from('bs_creditos').insert({ cliente_id: clienteId, perfume_id: null, monto_total: total, anticipo: 0, saldo: total, plazo_semanas: 4, estatus: 'activo', notas: 'Electrónico: ' + elecCart.map(x=>x.nombre).join(', ') });
+    const { data: crData } = await db.from('bs_creditos').insert({ cliente_id: clienteId, perfume_id: null, monto_total: total, anticipo: 0, saldo: total, plazo_semanas: 4, estatus: 'activo', notas: elecNota }).select().single();
   }
   registrarLog('venta', 'electronicos', `Venta electrónico ${tipo} — $${total.toFixed(2)} (${elecCart.map(x=>x.nombre).join(', ')})`, {tipo, total});
   elecCart = [];
