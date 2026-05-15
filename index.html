@@ -403,7 +403,9 @@
 
       <!-- HISTORIAL -->
       <div class="page" id="page-historial">
-        <div class="section-header"><div><div class="gold-line"></div><div class="section-title">Historial de Ventas</div></div></div>
+        <div class="section-header"><div><div class="gold-line"></div><div class="section-title">Historial de Ventas</div></div>
+          <button class="btn btn-outline btn-sm" onclick="exportarHistorialCSV()">⬇ Exportar CSV</button>
+        </div>
         <div class="table-card">
           <div class="table-header"><div class="table-title">Todas las Ventas</div>
             <input type="date" id="filtro-fecha" onchange="renderHistorial()" style="width:auto">
@@ -417,7 +419,10 @@
       <div class="page" id="page-clientes">
         <div class="section-header">
           <div><div class="gold-line"></div><div class="section-title">Clientes</div></div>
-          <button class="btn btn-gold" onclick="openModal('modal-cliente')">+ Cliente</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-outline btn-sm" onclick="exportarClientesCSV()">⬇ Exportar CSV</button>
+            <button class="btn btn-gold" onclick="openModal('modal-cliente')">+ Cliente</button>
+          </div>
         </div>
         <div class="table-card">
           <div class="table-header"><div class="table-title">Registro</div>
@@ -432,7 +437,10 @@
       <div class="page" id="page-apartados">
         <div class="section-header">
           <div><div class="gold-line"></div><div class="section-title">Apartados</div></div>
-          <button class="btn btn-gold" onclick="openModal('modal-apartado')">+ Apartado</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-outline btn-sm" onclick="exportarApartadosCSV()">⬇ Exportar CSV</button>
+            <button class="btn btn-gold" onclick="openModal('modal-apartado')">+ Apartado</button>
+          </div>
         </div>
         <div class="tabs">
           <button class="tab active" onclick="tabFilter('apartados','activo',this)">Activos</button>
@@ -446,7 +454,10 @@
       <div class="page" id="page-creditos">
         <div class="section-header">
           <div><div class="gold-line"></div><div class="section-title">Créditos</div></div>
-          <button class="btn btn-gold" onclick="openModal('modal-credito')">+ Crédito</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-outline btn-sm" onclick="exportarCreditosCSV()">⬇ Exportar CSV</button>
+            <button class="btn btn-gold" onclick="openModal('modal-credito')">+ Crédito</button>
+          </div>
         </div>
         <div class="tabs">
           <button class="tab active" onclick="tabFilter('creditos','activo',this)">Activos</button>
@@ -790,6 +801,28 @@
   </div>
 </div>
 
+<!-- MODAL WHATSAPP PLANTILLAS -->
+<div class="modal-overlay" id="modal-whatsapp">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header"><div class="modal-title">💬 Mensaje WhatsApp</div><button class="modal-close" onclick="closeModal('modal-whatsapp')">✕</button></div>
+    <div class="modal-body">
+      <div style="background:var(--darker);padding:10px 14px;border-radius:8px;margin-bottom:14px;font-size:.85rem">
+        <strong id="wa-cliente-nombre">—</strong> · <span id="wa-cliente-tel" style="color:var(--text-muted)">—</span>
+      </div>
+      <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:10px">Elige una plantilla o escribe tu mensaje:</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px" id="wa-plantillas"></div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>Mensaje personalizado</label>
+        <textarea id="wa-mensaje" rows="4" placeholder="Escribe tu mensaje aquí..." style="resize:vertical"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-whatsapp')">Cancelar</button>
+      <button class="btn btn-gold" onclick="enviarWhatsApp()">📲 Abrir WhatsApp</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL AJUSTE STOCK -->
 <div class="modal-overlay" id="modal-ajuste-stock">
   <div class="modal">
@@ -936,25 +969,44 @@ function getClienteNombre(id) { const c = clientes.find(x => x.id == id); return
 function getPerfumeNombre(id) { const p = perfumes.find(x => x.id == id); return p ? p.nombre : '—'; }
 
 // ===================== PHOTO =====================
-function handlePhoto(input) {
-  const file = input.files[0]; if (!file) return;
+function comprimirImagen(file, maxPx, calidad, callback) {
   const reader = new FileReader();
   reader.onload = e => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      const MAX = 400; let w = img.width, h = img.height;
-      if (w > h) { if (w > MAX) { h = h*(MAX/w); w = MAX; } } else { if (h > MAX) { w = w*(MAX/h); h = MAX; } }
+      let w = img.width, h = img.height;
+      if (w > h) { if (w > maxPx) { h = h*(maxPx/w); w = maxPx; } } else { if (h > maxPx) { w = w*(maxPx/h); h = maxPx; } }
       canvas.width = Math.round(w); canvas.height = Math.round(h);
       canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      fotoDataUrl = canvas.toDataURL('image/jpeg', 0.45);
-      const prev = document.getElementById('foto-preview');
-      prev.src = fotoDataUrl; prev.style.display = 'block';
-      document.getElementById('foto-placeholder').style.display = 'none';
+      canvas.toBlob(blob => callback(blob, canvas.toDataURL('image/jpeg', calidad)), 'image/jpeg', calidad);
     };
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
+}
+
+async function subirFotoStorage(blob, carpeta) {
+  const ext = 'jpg';
+  const filename = `${carpeta}/${Date.now()}.${ext}`;
+  const { data, error } = await db.storage.from('bella-select').upload(filename, blob, { contentType: 'image/jpeg', upsert: true });
+  if (error) return null;
+  const { data: urlData } = db.storage.from('bella-select').getPublicUrl(filename);
+  return urlData?.publicUrl || null;
+}
+
+function handlePhoto(input) {
+  const file = input.files[0]; if (!file) return;
+  const placeholder = document.getElementById('foto-placeholder');
+  const prev = document.getElementById('foto-preview');
+  placeholder.textContent = 'Procesando...';
+  comprimirImagen(file, 600, 0.75, async (blob, dataUrl) => {
+    prev.src = dataUrl; prev.style.display = 'block';
+    placeholder.style.display = 'none';
+    fotoDataUrl = dataUrl;
+    const url = await subirFotoStorage(blob, 'perfumes');
+    if (url) fotoDataUrl = url;
+  });
 }
 
 // ===================== SCANNER =====================
@@ -1429,7 +1481,7 @@ async function renderClientes() {
       <td>${c.telefono||'—'}</td><td>${compras}</td>
       <td class="${saldo>0?'price':''}">${saldo>0?'$'+saldo.toFixed(2):'—'}</td>
       <td><div style="display:flex;gap:6px">
-        ${c.telefono?`<a href="https://wa.me/52${c.telefono.replace(/\D/g,'')}" target="_blank" class="btn btn-outline btn-sm">WhatsApp</a>`:''}
+        ${c.telefono?`<button class="btn btn-outline btn-sm" onclick="abrirWhatsApp(${c.id},'${c.nombre.replace(/'/g,"\\'")}','${c.telefono}',${saldo})">💬 WhatsApp</button>`:''}
         <button class="btn btn-danger btn-sm" onclick="eliminarCliente(${c.id})">✕</button>
       </div></td>
     </tr>`;
@@ -1658,23 +1710,16 @@ async function loadCategoriasElec() {
 
 function handleElecPhoto(input) {
   const file = input.files[0]; if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const MAX = 400; let w = img.width, h = img.height;
-      if (w > h) { if (w > MAX) { h = h*(MAX/w); w = MAX; } } else { if (h > MAX) { w = w*(MAX/h); h = MAX; } }
-      canvas.width = Math.round(w); canvas.height = Math.round(h);
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      elecFotoDataUrl = canvas.toDataURL('image/jpeg', 0.45);
-      const prev = document.getElementById('elec-foto-preview');
-      prev.src = elecFotoDataUrl; prev.style.display = 'block';
-      document.getElementById('elec-foto-placeholder').style.display = 'none';
-    };
-    img.src = e.target.result;
-  };
-  reader.readAsDataURL(file);
+  const placeholder = document.getElementById('elec-foto-placeholder');
+  const prev = document.getElementById('elec-foto-preview');
+  placeholder.textContent = 'Procesando...';
+  comprimirImagen(file, 600, 0.75, async (blob, dataUrl) => {
+    prev.src = dataUrl; prev.style.display = 'block';
+    placeholder.style.display = 'none';
+    elecFotoDataUrl = dataUrl;
+    const url = await subirFotoStorage(blob, 'electronicos');
+    if (url) elecFotoDataUrl = url;
+  });
 }
 
 async function guardarElec() {
@@ -2250,6 +2295,125 @@ async function reimprimirComprobante(ventaId) {
     semanas: v.semanas || 4
   };
   generarComprobante(v, items, r);
+}
+
+// ===================== WHATSAPP PLANTILLAS =====================
+let waTarget = null;
+
+function abrirWhatsApp(clienteId, nombre, telefono, saldo) {
+  waTarget = { telefono };
+  document.getElementById('wa-cliente-nombre').textContent = nombre;
+  document.getElementById('wa-cliente-tel').textContent = telefono;
+  const saldoFmt = saldo > 0 ? `$${Number(saldo).toFixed(2)}` : null;
+  const plantillas = [
+    { label: '💰 Recordatorio de saldo', msg: `Hola ${nombre}, te recordamos que tienes un saldo pendiente de ${saldoFmt || 'tu cuenta'} en Bella Select. Cualquier duda estamos para ayudarte. 🌸` },
+    { label: '✅ Tu apartado está listo', msg: `Hola ${nombre}, tu apartado ya está listo para recoger en Bella Select. ¡Te esperamos! 🌸` },
+    { label: '🔔 Aviso de pago próximo', msg: `Hola ${nombre}, te avisamos que tu pago está próximo a vencer en Bella Select. ¡Contáctanos si necesitas ayuda! 💛` },
+    { label: '🎉 Gracias por tu compra', msg: `Hola ${nombre}, muchas gracias por tu compra en Bella Select. ¡Fue un placer atenderte! Vuelve pronto. 🌸💛` },
+  ];
+  const cont = document.getElementById('wa-plantillas');
+  cont.innerHTML = plantillas.map(p => `
+    <button class="btn btn-outline btn-sm" style="text-align:left;height:auto;padding:8px 12px;font-size:.8rem;white-space:normal"
+      onclick="seleccionarPlantillaWa(this, \`${p.msg.replace(/`/g,"'")}\`)">${p.label}</button>
+  `).join('');
+  document.getElementById('wa-mensaje').value = plantillas[0].msg;
+  openModal('modal-whatsapp');
+}
+
+function seleccionarPlantillaWa(btn, msg) {
+  document.querySelectorAll('#wa-plantillas .btn').forEach(b => b.classList.remove('btn-gold'));
+  btn.classList.add('btn-gold');
+  document.getElementById('wa-mensaje').value = msg;
+}
+
+function enviarWhatsApp() {
+  if (!waTarget) return;
+  const msg = document.getElementById('wa-mensaje').value.trim();
+  if (!msg) { toast('Escribe un mensaje', 'error'); return; }
+  const tel = '52' + waTarget.telefono.replace(/\D/g, '');
+  window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, '_blank');
+  closeModal('modal-whatsapp');
+}
+
+// ===================== EXPORTAR CSV =====================
+function descargarCSV(filas, encabezados, nombre) {
+  const esc = val => {
+    const s = String(val ?? '').replace(/"/g, '""');
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s}"` : s;
+  };
+  const csv = [encabezados.map(esc).join(','), ...filas.map(f => f.map(esc).join(','))].join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${nombre}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+async function exportarHistorialCSV() {
+  toast('Generando reporte...', 'success');
+  const fecha = document.getElementById('filtro-fecha').value;
+  let query = db.from('bs_ventas').select('*').order('fecha', { ascending: false }).limit(1000);
+  if (fecha) query = query.gte('fecha', fecha + 'T00:00:00').lte('fecha', fecha + 'T23:59:59');
+  const { data } = await query;
+  if (!data || !data.length) { toast('Sin datos para exportar', 'error'); return; }
+  const filas = data.map(v => [
+    '#' + String(v.id).slice(-4),
+    new Date(v.fecha).toLocaleDateString('es-MX'),
+    getClienteNombre(v.cliente_id),
+    v.tipo,
+    v.estatus,
+    Number(v.total).toFixed(2),
+    Number(v.total_final || v.total).toFixed(2),
+    Number(v.descuento || 0).toFixed(2),
+    v.vendedor_nombre || '—'
+  ]);
+  descargarCSV(filas, ['ID','Fecha','Cliente','Tipo','Estatus','Subtotal','Total Final','Descuento','Vendedor'], 'historial_ventas');
+}
+
+async function exportarClientesCSV() {
+  if (!clientes.length) { toast('Sin clientes para exportar', 'error'); return; }
+  const { data: aps } = await db.from('bs_apartados').select('cliente_id, saldo').eq('estatus', 'activo');
+  const { data: crs } = await db.from('bs_creditos').select('cliente_id, saldo').eq('estatus', 'activo');
+  const filas = clientes.map(c => {
+    const saldo = ((aps||[]).filter(a=>a.cliente_id==c.id).reduce((s,x)=>s+Number(x.saldo),0)) +
+                  ((crs||[]).filter(cr=>cr.cliente_id==c.id).reduce((s,x)=>s+Number(x.saldo),0));
+    return [c.nombre, c.telefono||'', c.correo||'', c.direccion||'', saldo.toFixed(2)];
+  });
+  descargarCSV(filas, ['Nombre','Teléfono','Email','Dirección','Saldo Pendiente'], 'clientes');
+}
+
+async function exportarApartadosCSV() {
+  const { data } = await db.from('bs_apartados').select('*').order('creado', { ascending: false });
+  if (!data || !data.length) { toast('Sin apartados para exportar', 'error'); return; }
+  const filas = data.map(a => [
+    '#' + String(a.id).slice(-4),
+    new Date(a.creado).toLocaleDateString('es-MX'),
+    getClienteNombre(a.cliente_id),
+    a.notas || getPerfumeNombre(a.perfume_id),
+    Number(a.monto_total).toFixed(2),
+    Number(a.anticipo||0).toFixed(2),
+    Number(a.saldo).toFixed(2),
+    a.estatus,
+    a.fecha_limite ? new Date(a.fecha_limite).toLocaleDateString('es-MX') : ''
+  ]);
+  descargarCSV(filas, ['ID','Fecha','Cliente','Producto','Total','Anticipo','Saldo','Estatus','Fecha Límite'], 'apartados');
+}
+
+async function exportarCreditosCSV() {
+  const { data } = await db.from('bs_creditos').select('*').order('creado', { ascending: false });
+  if (!data || !data.length) { toast('Sin créditos para exportar', 'error'); return; }
+  const filas = data.map(cr => [
+    '#' + String(cr.id).slice(-4),
+    new Date(cr.creado).toLocaleDateString('es-MX'),
+    getClienteNombre(cr.cliente_id),
+    cr.notas || getPerfumeNombre(cr.perfume_id),
+    Number(cr.monto_total).toFixed(2),
+    Number(cr.anticipo||0).toFixed(2),
+    Number(cr.saldo).toFixed(2),
+    cr.plazo_semanas || 4,
+    cr.estatus
+  ]);
+  descargarCSV(filas, ['ID','Fecha','Cliente','Producto','Total','Anticipo','Saldo','Plazo (semanas)','Estatus'], 'creditos');
 }
 
 // ===================== AJUSTE DE STOCK =====================
