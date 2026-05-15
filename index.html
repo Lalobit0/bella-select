@@ -252,6 +252,7 @@
       <div class="nav-item" onclick="navigate('creditos',this)"><span class="nav-icon">◐</span> Créditos <span class="nav-badge" id="badge-creditos" style="display:none"></span></div>
       <div class="nav-item" id="nav-log" style="display:none" onclick="navigate('log',this)"><span class="nav-icon">📋</span> Log Admin</div>
       <div class="nav-item" id="nav-ventas-vendedores" style="display:none" onclick="navigate('ventas-vendedores',this)"><span class="nav-icon">👥</span> Ventas Vendedores</div>
+      <div class="nav-item" id="nav-usuarios" style="display:none" onclick="navigate('usuarios',this)"><span class="nav-icon">🔑</span> Usuarios</div>
       <div class="nav-section">Electrónicos</div>
       <div class="nav-item" onclick="navigate('elec-catalogo',this)"><span class="nav-icon">📺</span> Catálogo</div>
       <div class="nav-item" onclick="navigate('elec-venta',this)"><span class="nav-icon">🛒</span> Venta Electrónico</div>
@@ -519,6 +520,18 @@
         </div>
       </div>
 
+      <!-- USUARIOS (admin only) -->
+      <div class="page" id="page-usuarios">
+        <div class="section-header">
+          <div><div class="gold-line"></div><div class="section-title">Gestión de Usuarios</div></div>
+          <button class="btn btn-gold" onclick="openModal('modal-usuario')">+ Nuevo Usuario</button>
+        </div>
+        <div class="table-card">
+          <table><thead><tr><th>Usuario</th><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody id="tabla-usuarios"><tr><td colspan="6"><div class="loading"><div class="spinner"></div>Cargando...</div></td></tr></tbody></table>
+        </div>
+      </div>
+
       <!-- ELECTRÓNICOS CATÁLOGO -->
       <div class="page" id="page-elec-catalogo">
         <div class="section-header">
@@ -777,6 +790,69 @@
   </div>
 </div>
 
+<!-- MODAL AJUSTE STOCK -->
+<div class="modal-overlay" id="modal-ajuste-stock">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Ajustar Stock</div><button class="modal-close" onclick="closeModal('modal-ajuste-stock')">✕</button></div>
+    <div class="modal-body">
+      <div style="background:var(--darker);padding:12px 16px;border-radius:8px;margin-bottom:16px">
+        <div style="font-weight:600" id="ajuste-producto-nombre">—</div>
+        <div style="font-size:.8rem;color:var(--text-muted)">Stock actual: <strong id="ajuste-stock-actual" style="color:var(--gold)">—</strong></div>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Tipo de ajuste</label>
+          <select id="ajuste-tipo" onchange="actualizarAjustePreview()">
+            <option value="entrada">Entrada — llegó mercancía (+)</option>
+            <option value="salida">Salida — retiro manual (-)</option>
+            <option value="devolucion">Devolución de cliente (+)</option>
+            <option value="danio">Daño / Merma (-)</option>
+            <option value="conteo">Conteo físico (reemplaza stock)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Cantidad</label>
+          <input type="number" id="ajuste-cantidad" placeholder="0" min="0" oninput="actualizarAjustePreview()">
+        </div>
+        <div class="form-group full" style="background:var(--darker);padding:10px 14px;border-radius:8px">
+          <span style="font-size:.82rem;color:var(--text-muted)">Stock resultante: </span><strong id="ajuste-preview" style="color:var(--gold);font-size:1.1rem">—</strong>
+        </div>
+        <div class="form-group full">
+          <label>Motivo / Notas</label>
+          <input type="text" id="ajuste-notas" placeholder="ej. Llegó pedido proveedor, producto dañado...">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-ajuste-stock')">Cancelar</button>
+      <button class="btn btn-gold" onclick="guardarAjusteStock()">Aplicar Ajuste</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL USUARIO -->
+<div class="modal-overlay" id="modal-usuario">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Nuevo Usuario</div><button class="modal-close" onclick="closeModal('modal-usuario')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full"><label>Nombre completo *</label><input type="text" id="usr-nombre" placeholder="ej. María López"></div>
+        <div class="form-group"><label>Usuario para login *</label><input type="text" id="usr-usuario" placeholder="ej. maria" oninput="this.value=this.value.toLowerCase()"></div>
+        <div class="form-group"><label>Email *</label><input type="email" id="usr-email" placeholder="maria@bellaselect.com"></div>
+        <div class="form-group"><label>Contraseña *</label><input type="password" id="usr-pass" placeholder="Mínimo 6 caracteres"></div>
+        <div class="form-group"><label>Rol</label>
+          <select id="usr-rol"><option value="vendedor">Vendedor</option><option value="admin">Admin</option></select>
+        </div>
+      </div>
+      <div id="usr-msg" style="font-size:.82rem;margin-top:10px;padding:8px 12px;border-radius:6px;display:none"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-usuario')">Cancelar</button>
+      <button class="btn btn-gold" id="btn-guardar-usuario" onclick="guardarUsuario()">Crear Usuario</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ===================== SUPABASE =====================
 const SUPABASE_URL = 'https://ivpxysaqjuwfpwexurfj.supabase.co';
@@ -807,7 +883,7 @@ let scannerStream = null;
 let fotoDataUrl = null;
 
 // ===================== NAVIGATION =====================
-const pageTitles = { dashboard:'Dashboard', inventario:'Catálogo', marcas:'Marcas', ventas:'Nueva Venta', historial:'Historial', clientes:'Clientes', apartados:'Apartados', creditos:'Créditos' };
+const pageTitles = { dashboard:'Dashboard', inventario:'Catálogo', marcas:'Marcas', ventas:'Nueva Venta', historial:'Historial', clientes:'Clientes', apartados:'Apartados', creditos:'Créditos', usuarios:'Usuarios' };
 
 function navigate(page, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -816,7 +892,7 @@ function navigate(page, el) {
   if (el) el.classList.add('active');
   document.getElementById('pageTitle').textContent = pageTitles[page] || page;
   closeSidebar();
-  const fns = { dashboard: renderDashboard, inventario: renderInventario, marcas: renderMarcas, ventas: renderVentaPage, historial: renderHistorial, clientes: renderClientes, apartados: renderApartados, creditos: renderCreditos };
+  const fns = { dashboard: renderDashboard, inventario: renderInventario, marcas: renderMarcas, ventas: renderVentaPage, historial: renderHistorial, clientes: renderClientes, apartados: renderApartados, creditos: renderCreditos, usuarios: renderUsuarios };
   if (fns[page]) fns[page]();
 }
 function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); document.getElementById('sidebarOverlay').classList.toggle('open'); }
@@ -950,7 +1026,10 @@ async function guardarPerfume() {
   }
   btn.disabled = false; btn.textContent = 'Guardar Perfume';
   if (error) { toast('Error: ' + error.message, 'error'); return; }
+  const accionLog = editingPerfumeId ? 'editar' : 'crear';
+  const descLog = editingPerfumeId ? `Editó perfume: ${nombre}` : `Nuevo perfume: ${nombre}`;
   toast(editingPerfumeId ? 'Perfume actualizado' : 'Perfume agregado', 'success');
+  registrarLog(accionLog, 'perfumes', descLog, { nombre, precio, stock });
   closeModal('modal-perfume');
   await loadPerfumes();
   renderInventario(); updateDashStats();
@@ -1032,14 +1111,18 @@ function renderInventarioContent(cont, list) {
   if (!list.length) { cont.innerHTML = '<div class="empty-state"><span class="icon">✦</span><p>Sin productos en esta categoría</p></div>'; return; }
   if (currentView === 'grid') {
     cont.innerHTML = `<div class="products-grid">${list.map(p => `
-      <div class="product-card" onclick="editarPerfume(${p.id})">
-        <div class="product-card-img">${p.foto_url ? `<img src="${p.foto_url}">` : '🧴'}</div>
+      <div class="product-card">
+        <div class="product-card-img" onclick="editarPerfume(${p.id})" style="cursor:pointer">${p.foto_url ? `<img src="${p.foto_url}">` : '🧴'}</div>
         <div class="product-card-body">
           <div class="product-card-name">${p.nombre}</div>
           <div class="product-card-brand">${getMarcaNombre(p.marca_id)} · ${p.concentracion||''}</div>
           <div class="product-card-footer">
             <span class="price">$${Number(p.precio_venta).toFixed(2)}</span>
             <span class="${p.stock<=(p.stock_minimo||2)?'badge badge-red':''}">📦 ${p.stock}</span>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:8px">
+            <button class="btn btn-outline btn-sm" style="flex:1" onclick="editarPerfume(${p.id})">✎ Editar</button>
+            <button class="btn btn-outline btn-sm" onclick="abrirAjusteStock(${p.id},'perfume')" title="Ajustar stock">📦</button>
           </div>
         </div>
       </div>`).join('')}</div>`;
@@ -1062,7 +1145,8 @@ function renderInventarioRows(list) {
     <td><span class="${p.stock<=(p.stock_minimo||2)?'badge badge-red':'badge badge-green'}">${p.stock}</span></td>
     <td class="price">$${Number(p.precio_venta).toFixed(2)}</td>
     <td><div style="display:flex;gap:6px">
-      <button class="btn btn-outline btn-sm" onclick="editarPerfume(${p.id})">✎</button>
+      <button class="btn btn-outline btn-sm" onclick="editarPerfume(${p.id})" title="Editar">✎</button>
+      <button class="btn btn-outline btn-sm" onclick="abrirAjusteStock(${p.id},'perfume')" title="Ajustar stock">📦</button>
       <button class="btn btn-danger btn-sm" onclick="eliminarPerfume(${p.id})">✕</button>
     </div></td>
   </tr>`).join('');
@@ -1703,14 +1787,18 @@ function renderElecContent(cont, list) {
   if (!list.length) { cont.innerHTML = '<div class="empty-state"><span class="icon">📺</span><p>Sin productos electrónicos</p></div>'; return; }
   if (currentElecView === 'grid') {
     cont.innerHTML = `<div class="products-grid">${list.map(e => `
-      <div class="product-card" onclick="editarElec(${e.id})">
-        <div class="product-card-img">${e.foto_url ? `<img src="${e.foto_url}">` : '📺'}</div>
+      <div class="product-card">
+        <div class="product-card-img" onclick="editarElec(${e.id})" style="cursor:pointer">${e.foto_url ? `<img src="${e.foto_url}">` : '📺'}</div>
         <div class="product-card-body">
           <div class="product-card-name">${e.nombre}</div>
           <div class="product-card-brand">${e.marca||''} ${e.modelo||''} ${e.capacidad||''}</div>
           <div class="product-card-footer">
             <span class="price">$${Number(e.precio_venta).toFixed(2)}</span>
             <span class="${e.stock<=(e.stock_minimo||1)?'badge badge-red':''}">📦 ${e.stock}</span>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:8px">
+            <button class="btn btn-outline btn-sm" style="flex:1" onclick="editarElec(${e.id})">✎ Editar</button>
+            <button class="btn btn-outline btn-sm" onclick="abrirAjusteStock(${e.id},'elec')" title="Ajustar stock">📦</button>
           </div>
         </div>
       </div>`).join('')}</div>`;
@@ -1736,7 +1824,8 @@ function renderElecRows(list) {
     <td><span class="${e.stock<=(e.stock_minimo||1)?'badge badge-red':'badge badge-green'}">${e.stock}</span></td>
     <td class="price">$${Number(e.precio_venta).toFixed(2)}</td>
     <td><div style="display:flex;gap:6px">
-      <button class="btn btn-outline btn-sm" onclick="editarElec(${e.id})">✎</button>
+      <button class="btn btn-outline btn-sm" onclick="editarElec(${e.id})" title="Editar">✎</button>
+      <button class="btn btn-outline btn-sm" onclick="abrirAjusteStock(${e.id},'elec')" title="Ajustar stock">📦</button>
       <button class="btn btn-danger btn-sm" onclick="eliminarElec(${e.id})">✕</button>
     </div></td>
   </tr>`).join('');
@@ -1887,12 +1976,20 @@ async function doLogin() {
   const usuarioInput = document.getElementById('login-usuario').value.trim().toLowerCase();
   const pass = document.getElementById('login-pass').value;
   if (!usuarioInput || !pass) { errEl.textContent = 'Ingresa usuario y contraseña'; return; }
-  const usuarioMap = {
+  const usuarioMapFallback = {
     'admin': 'admin@bellaselect.com',
     'angelica': 'angelica@bellaselect.com',
     'angélica': 'angelica@bellaselect.com'
   };
-  const email = usuarioMap[usuarioInput];
+  let email = null;
+  try {
+    const { data: usuarioData } = await db.from('bs_usuarios').select('email, activo').eq('usuario', usuarioInput).single();
+    if (usuarioData) {
+      if (!usuarioData.activo) { errEl.textContent = 'Usuario desactivado. Contacta al administrador.'; return; }
+      email = usuarioData.email;
+    }
+  } catch(_) {}
+  if (!email) email = usuarioMapFallback[usuarioInput] || null;
   if (!email) { errEl.textContent = 'Usuario no reconocido'; return; }
   btn.disabled = true; btn.textContent = 'Entrando...';
   errEl.textContent = '';
@@ -1934,14 +2031,17 @@ function iniciarApp() {
   const navLog = document.getElementById('nav-log');
   const navMisVentas = document.getElementById('nav-mis-ventas');
   const navVV = document.getElementById('nav-ventas-vendedores');
+  const navUsuarios = document.getElementById('nav-usuarios');
   if (currentUserRol === 'admin') {
     navLog.style.display = '';
     if (navMisVentas) navMisVentas.style.display = 'none';
     if (navVV) navVV.style.display = '';
+    if (navUsuarios) navUsuarios.style.display = '';
   } else {
     navLog.style.display = 'none';
     if (navMisVentas) navMisVentas.style.display = '';
     if (navVV) navVV.style.display = 'none';
+    if (navUsuarios) navUsuarios.style.display = 'none';
   }
   // Aplicar restricciones de rol al DOM después de render
   applyRoleRestrictions();
@@ -2150,6 +2250,130 @@ async function reimprimirComprobante(ventaId) {
     semanas: v.semanas || 4
   };
   generarComprobante(v, items, r);
+}
+
+// ===================== AJUSTE DE STOCK =====================
+let ajusteTarget = null;
+
+function abrirAjusteStock(id, tipo) {
+  const item = tipo === 'perfume' ? perfumes.find(x => x.id === id) : electronicos.find(x => x.id === id);
+  if (!item) return;
+  ajusteTarget = { id, tipo, stockActual: item.stock };
+  document.getElementById('ajuste-producto-nombre').textContent = item.nombre;
+  document.getElementById('ajuste-stock-actual').textContent = item.stock;
+  document.getElementById('ajuste-tipo').value = 'entrada';
+  document.getElementById('ajuste-cantidad').value = '';
+  document.getElementById('ajuste-notas').value = '';
+  document.getElementById('ajuste-preview').textContent = '—';
+  openModal('modal-ajuste-stock');
+}
+
+function actualizarAjustePreview() {
+  if (!ajusteTarget) return;
+  const tipo = document.getElementById('ajuste-tipo').value;
+  const qty = parseInt(document.getElementById('ajuste-cantidad').value) || 0;
+  const actual = ajusteTarget.stockActual;
+  let resultado;
+  if (tipo === 'entrada' || tipo === 'devolucion') resultado = actual + qty;
+  else if (tipo === 'salida' || tipo === 'danio') resultado = Math.max(0, actual - qty);
+  else resultado = qty;
+  document.getElementById('ajuste-preview').textContent = resultado;
+}
+
+async function guardarAjusteStock() {
+  if (!ajusteTarget) return;
+  const tipo = document.getElementById('ajuste-tipo').value;
+  const qty = parseInt(document.getElementById('ajuste-cantidad').value) || 0;
+  const notas = document.getElementById('ajuste-notas').value.trim();
+  if (qty < 0 || (tipo !== 'conteo' && qty === 0)) { toast('Ingresa una cantidad válida', 'error'); return; }
+  const actual = ajusteTarget.stockActual;
+  let nuevoStock;
+  if (tipo === 'entrada' || tipo === 'devolucion') nuevoStock = actual + qty;
+  else if (tipo === 'salida' || tipo === 'danio') nuevoStock = Math.max(0, actual - qty);
+  else nuevoStock = qty;
+  const table = ajusteTarget.tipo === 'perfume' ? 'bs_perfumes' : 'bs_electronicos';
+  const { error } = await db.from(table).update({ stock: nuevoStock }).eq('id', ajusteTarget.id);
+  if (error) { toast('Error al ajustar: ' + error.message, 'error'); return; }
+  const nombre = document.getElementById('ajuste-producto-nombre').textContent;
+  const tipoLabel = { entrada:'Entrada', salida:'Salida', devolucion:'Devolución', danio:'Daño/Merma', conteo:'Conteo físico' }[tipo] || tipo;
+  registrarLog('editar', ajusteTarget.tipo === 'perfume' ? 'perfumes' : 'electronicos',
+    `Ajuste stock (${tipoLabel}): ${nombre} ${actual} → ${nuevoStock}${notas ? ' — ' + notas : ''}`,
+    { tipo, anterior: actual, nuevo: nuevoStock, qty, notas });
+  toast(`Stock actualizado: ${actual} → ${nuevoStock}`, 'success');
+  closeModal('modal-ajuste-stock');
+  ajusteTarget = null;
+  if (table === 'bs_perfumes') { await loadPerfumes(); renderInventario(); }
+  else { await loadElectronicos(); renderElecCatalogo(); }
+  updateDashStats();
+}
+
+// ===================== USUARIOS =====================
+async function renderUsuarios() {
+  const tbody = document.getElementById('tabla-usuarios');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="6"><div class="loading"><div class="spinner"></div>Cargando...</div></td></tr>';
+  try {
+    const { data, error } = await db.from('bs_usuarios').select('*').order('creado', { ascending: true });
+    if (error) { tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><span class="icon">🔑</span><p>Error: ${error.message}</p></div></td></tr>`; return; }
+    if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><span class="icon">🔑</span><p>Sin usuarios registrados</p></div></td></tr>'; return; }
+    tbody.innerHTML = data.map(u => `<tr>
+      <td><strong>${u.usuario||'—'}</strong></td>
+      <td>${u.nombre}</td>
+      <td style="font-size:.78rem;color:var(--text-muted)">${u.email||'—'}</td>
+      <td><span class="badge ${u.rol==='admin'?'badge-gold':'badge-green'}">${u.rol}</span></td>
+      <td><span class="badge ${u.activo?'badge-green':'badge-red'}">${u.activo?'Activo':'Inactivo'}</span></td>
+      <td><div style="display:flex;gap:6px">
+        <button class="btn btn-outline btn-sm" onclick="toggleUsuarioActivo('${u.id}',${u.activo})">${u.activo?'Desactivar':'Activar'}</button>
+        <button class="btn btn-danger btn-sm" onclick="eliminarUsuario('${u.id}')">✕</button>
+      </div></td>
+    </tr>`).join('');
+  } catch(e) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><span class="icon">🔑</span><p>Error al cargar</p></div></td></tr>'; }
+}
+
+async function guardarUsuario() {
+  const nombre = document.getElementById('usr-nombre').value.trim();
+  const usuario = document.getElementById('usr-usuario').value.trim().toLowerCase();
+  const email = document.getElementById('usr-email').value.trim().toLowerCase();
+  const pass = document.getElementById('usr-pass').value;
+  const rol = document.getElementById('usr-rol').value;
+  const msgEl = document.getElementById('usr-msg');
+  if (!nombre || !usuario || !email || !pass) { mostrarUsrMsg('Todos los campos son requeridos', 'error'); return; }
+  if (pass.length < 6) { mostrarUsrMsg('La contraseña debe tener al menos 6 caracteres', 'error'); return; }
+  const btn = document.getElementById('btn-guardar-usuario');
+  btn.disabled = true; btn.textContent = 'Creando...';
+  try {
+    const { data: authData, error: authError } = await db.auth.signUp({ email, password: pass, options: { data: { nombre, rol } } });
+    if (authError) { mostrarUsrMsg('Error auth: ' + authError.message, 'error'); btn.disabled = false; btn.textContent = 'Crear Usuario'; return; }
+    const { error: dbError } = await db.from('bs_usuarios').insert({ usuario, email, nombre, rol, activo: true });
+    if (dbError) { mostrarUsrMsg('Usuario creado en auth pero error en tabla: ' + dbError.message, 'error'); btn.disabled = false; btn.textContent = 'Crear Usuario'; return; }
+    registrarLog('crear', 'usuarios', `Nuevo usuario: ${nombre} (${usuario}) — rol: ${rol}`, { usuario, email, rol });
+    mostrarUsrMsg(`Usuario "${usuario}" creado correctamente`, 'success');
+    btn.disabled = false; btn.textContent = 'Crear Usuario';
+    ['usr-nombre','usr-usuario','usr-email','usr-pass'].forEach(id => document.getElementById(id).value = '');
+    setTimeout(() => { closeModal('modal-usuario'); renderUsuarios(); }, 1500);
+  } catch(e) { mostrarUsrMsg('Error: ' + e.message, 'error'); btn.disabled = false; btn.textContent = 'Crear Usuario'; }
+}
+
+function mostrarUsrMsg(msg, tipo) {
+  const el = document.getElementById('usr-msg');
+  el.textContent = msg;
+  el.style.display = 'block';
+  el.style.background = tipo === 'error' ? 'rgba(220,53,69,.15)' : 'rgba(76,175,124,.15)';
+  el.style.color = tipo === 'error' ? '#ff6b6b' : '#4CAF7C';
+  el.style.border = `1px solid ${tipo === 'error' ? 'rgba(220,53,69,.3)' : 'rgba(76,175,124,.3)'}`;
+}
+
+async function toggleUsuarioActivo(rowId, activo) {
+  await db.from('bs_usuarios').update({ activo: !activo }).eq('id', rowId);
+  toast(activo ? 'Usuario desactivado' : 'Usuario activado', 'success');
+  renderUsuarios();
+}
+
+async function eliminarUsuario(rowId) {
+  if (!confirm('¿Eliminar este usuario? Esta acción no elimina la cuenta de autenticación.')) return;
+  await db.from('bs_usuarios').delete().eq('id', rowId);
+  toast('Usuario eliminado', 'success');
+  renderUsuarios();
 }
 
 // ===================== LOG =====================
