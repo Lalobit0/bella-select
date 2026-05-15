@@ -184,8 +184,22 @@
     .menu-toggle{display:block;}
     .venta-layout{grid-template-columns:1fr;}
     .form-grid{grid-template-columns:1fr;}
-    .content{padding:16px;}
+    .content{padding:12px;}
     .products-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));}
+    .stats-grid{grid-template-columns:repeat(2,1fr);}
+    .table-card table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    .table-header{flex-direction:column;align-items:flex-start;}
+    .section-header{flex-wrap:wrap;gap:10px;}
+    .dash-2col{grid-template-columns:1fr !important;}
+    td,th{white-space:nowrap;}
+    .topbar{padding:12px 16px;}
+    .content{padding:12px;}
+  }
+  @media(max-width:480px){
+    .stats-grid{grid-template-columns:repeat(2,1fr);gap:10px;}
+    .stat-value{font-size:1.5rem;}
+    .stat-card{padding:14px;}
+    .modal{border-radius:12px;}
   }
   .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99;}
   .sidebar-overlay.open{display:block;}
@@ -279,12 +293,13 @@
       <div class="page" id="page-dashboard">
         <div class="stats-grid">
           <div class="stat-card"><div class="stat-label">Productos</div><div class="stat-value" id="stat-productos">—</div><div class="stat-sub">en catálogo</div></div>
-          <div class="stat-card"><div class="stat-label">Ventas Hoy</div><div class="stat-value" id="stat-ventas-hoy">$0</div><div class="stat-sub">contado</div></div>
+          <div class="stat-card"><div class="stat-label">Ventas Hoy</div><div class="stat-value" id="stat-ventas-hoy">$0</div><div class="stat-sub">todas las ventas</div></div>
+          <div class="stat-card"><div class="stat-label">Ventas del Mes</div><div class="stat-value" id="stat-ventas-mes">$0</div><div class="stat-sub" id="stat-ventas-mes-sub">este mes</div></div>
           <div class="stat-card"><div class="stat-label">Clientes</div><div class="stat-value" id="stat-clientes">—</div><div class="stat-sub">registrados</div></div>
           <div class="stat-card"><div class="stat-label">Apartados</div><div class="stat-value" id="stat-apartados">—</div><div class="stat-sub">activos</div></div>
           <div class="stat-card"><div class="stat-label">Por Cobrar</div><div class="stat-value" id="stat-cobrar">$0</div><div class="stat-sub">créditos+apartados</div></div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+        <div class="dash-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
           <div class="table-card">
             <div class="table-header"><div class="table-title">Últimas Ventas</div></div>
             <div id="dash-ventas"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
@@ -294,14 +309,24 @@
             <div id="dash-stock"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
           </div>
         </div>
-        <div class="table-card">
-          <div class="table-header"><div class="table-title">Ventas — últimos 14 días</div></div>
+        <div class="table-card" style="margin-bottom:20px">
+          <div class="table-header"><div class="table-title">Ventas — últimos 14 días</div><div id="dash-chart-total" style="font-size:.78rem;color:var(--gold)"></div></div>
           <div style="padding:16px 20px">
             <div class="chart-bar-wrap" id="chartBars"></div>
             <div style="display:flex;justify-content:space-between;margin-top:4px">
               <span style="font-size:.6rem;color:var(--text-muted)">14 días atrás</span>
               <span style="font-size:.6rem;color:var(--text-muted)">Hoy</span>
             </div>
+          </div>
+        </div>
+        <div class="dash-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+          <div class="table-card">
+            <div class="table-header"><div class="table-title">Top 5 Productos</div></div>
+            <div id="dash-top-productos"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
+          </div>
+          <div class="table-card">
+            <div class="table-header"><div class="table-title">Ventas por Tipo</div></div>
+            <div id="dash-desglose"><div class="loading"><div class="spinner"></div>Cargando...</div></div>
           </div>
         </div>
       </div>
@@ -798,6 +823,34 @@
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-elec')">Cancelar</button>
       <button class="btn btn-gold" id="btn-guardar-elec" onclick="guardarElec()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PERFIL CLIENTE -->
+<div class="modal-overlay" id="modal-cliente-perfil">
+  <div class="modal" style="max-width:580px">
+    <div class="modal-header">
+      <div style="display:flex;align-items:center;gap:14px">
+        <div id="perfil-avatar" style="width:44px;height:44px;border-radius:50%;background:var(--gold-dim);display:flex;align-items:center;justify-content:center;font-size:1.3rem;font-weight:600;color:var(--black)">?</div>
+        <div><div class="modal-title" id="perfil-nombre">—</div><div id="perfil-contacto" style="font-size:.75rem;color:var(--text-muted)"></div></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-cliente-perfil')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px" id="perfil-stats"></div>
+      <div style="margin-bottom:14px">
+        <div style="font-size:.65rem;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px">Apartados y Créditos Activos</div>
+        <div id="perfil-pendientes"></div>
+      </div>
+      <div>
+        <div style="font-size:.65rem;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px">Últimas Compras</div>
+        <div id="perfil-historial"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-cliente-perfil')">Cerrar</button>
+      <button class="btn btn-gold" id="perfil-wa-btn" onclick="">💬 WhatsApp</button>
     </div>
   </div>
 </div>
@@ -1540,13 +1593,13 @@ async function renderClientes() {
   tbody.innerHTML = clientes.map(c => {
     const compras = (vts || []).filter(v => v.cliente_id == c.id).length;
     const saldo = ((aps||[]).filter(a=>a.cliente_id==c.id).reduce((s,x)=>s+Number(x.saldo),0)) + ((crs||[]).filter(cr=>cr.cliente_id==c.id).reduce((s,x)=>s+Number(x.saldo),0));
-    return `<tr>
+    return `<tr style="cursor:pointer" onclick="verPerfilCliente(${c.id})">
       <td><div class="product-cell"><div class="client-avatar">${c.nombre.charAt(0).toUpperCase()}</div>
         <div><div class="product-name">${c.nombre}</div><div class="product-brand">${c.telefono||c.correo||'—'}</div></div></div></td>
       <td>${c.telefono||'—'}</td><td>${compras}</td>
       <td class="${saldo>0?'price':''}">${saldo>0?'$'+saldo.toFixed(2):'—'}</td>
-      <td><div style="display:flex;gap:6px">
-        ${c.telefono?`<button class="btn btn-outline btn-sm" onclick="abrirWhatsApp(${c.id},'${c.nombre.replace(/'/g,"\\'")}','${c.telefono}',${saldo})">💬 WhatsApp</button>`:''}
+      <td onclick="event.stopPropagation()"><div style="display:flex;gap:6px">
+        ${c.telefono?`<button class="btn btn-outline btn-sm" onclick="abrirWhatsApp(${c.id},'${c.nombre.replace(/'/g,"\\'")}','${c.telefono}',${saldo})">💬</button>`:''}
         <button class="btn btn-danger btn-sm" onclick="eliminarCliente(${c.id})">✕</button>
       </div></td>
     </tr>`;
@@ -1715,19 +1768,31 @@ async function renderDashboard() {
   ds.innerHTML = low.length ? `<table><tbody>${low.map(p=>`<tr><td>${p.nombre}</td><td><span class="badge badge-red">${p.stock} uds</span></td></tr>`).join('')}</tbody></table>` : '<div class="empty-state"><span class="icon">✦</span><p>Todo en orden</p></div>';
   // chart
   renderChart();
+  // top productos y desglose
+  renderDashTopProductos();
+  renderDashDesglose();
 }
+
 async function updateDashStats() {
   document.getElementById('stat-productos').textContent = perfumes.length;
   document.getElementById('stat-clientes').textContent = clientes.length;
   const hoy = new Date().toISOString().split('T')[0];
-  const { data: ventasHoy } = await db.from('bs_ventas').select('total').eq('tipo','contado').gte('fecha', hoy + 'T00:00:00');
+  const inicioMes = new Date(); inicioMes.setDate(1); inicioMes.setHours(0,0,0,0);
+  const [{ data: ventasHoy }, { data: ventasMes }, { data: aps }, { data: crs }] = await Promise.all([
+    db.from('bs_ventas').select('total').gte('fecha', hoy + 'T00:00:00').neq('estatus','devuelta'),
+    db.from('bs_ventas').select('total').gte('fecha', inicioMes.toISOString()).neq('estatus','devuelta'),
+    db.from('bs_apartados').select('id, saldo').eq('estatus','activo'),
+    db.from('bs_creditos').select('saldo').eq('estatus','activo')
+  ]);
   document.getElementById('stat-ventas-hoy').textContent = '$' + (ventasHoy||[]).reduce((s,v)=>s+Number(v.total),0).toFixed(0);
-  const { data: aps } = await db.from('bs_apartados').select('id, saldo').eq('estatus','activo');
-  const { data: crs } = await db.from('bs_creditos').select('saldo').eq('estatus','activo');
+  document.getElementById('stat-ventas-mes').textContent = '$' + (ventasMes||[]).reduce((s,v)=>s+Number(v.total),0).toFixed(0);
+  const mesNombre = new Date().toLocaleDateString('es-MX',{month:'long'});
+  document.getElementById('stat-ventas-mes-sub').textContent = mesNombre;
   document.getElementById('stat-apartados').textContent = (aps||[]).length;
   const cobrar = (aps||[]).reduce((s,x)=>s+Number(x.saldo),0) + (crs||[]).reduce((s,x)=>s+Number(x.saldo),0);
   document.getElementById('stat-cobrar').textContent = '$' + cobrar.toFixed(0);
 }
+
 function renderChart() {
   const wrap = document.getElementById('chartBars'); if (!wrap) return;
   const now = new Date(); const days = 14;
@@ -1735,10 +1800,102 @@ function renderChart() {
   for (let i = days-1; i >= 0; i--) {
     const d = new Date(now); d.setDate(d.getDate()-i);
     const ds = d.toISOString().split('T')[0];
-    totals.push(ventas.filter(v => v.fecha.startsWith(ds)).reduce((s,v) => s+Number(v.total), 0));
+    totals.push(ventas.filter(v => v.fecha.startsWith(ds) && v.estatus !== 'devuelta').reduce((s,v) => s+Number(v.total), 0));
   }
   const max = Math.max(...totals, 1);
-  wrap.innerHTML = totals.map(t => `<div class="chart-bar" style="height:${Math.round(t/max*100)}%" title="$${t.toFixed(0)}"></div>`).join('');
+  const total14 = totals.reduce((a,b)=>a+b,0);
+  const chartTotal = document.getElementById('dash-chart-total');
+  if (chartTotal) chartTotal.textContent = `Total: $${total14.toFixed(0)}`;
+  const dias = [];
+  for (let i = days-1; i >= 0; i--) { const d = new Date(now); d.setDate(d.getDate()-i); dias.push(d.toLocaleDateString('es-MX',{weekday:'short',day:'numeric'})); }
+  wrap.innerHTML = totals.map((t,i) => `<div class="chart-bar" style="height:${Math.round(t/max*100)}%" title="${dias[i]}: $${t.toFixed(0)}"></div>`).join('');
+}
+
+async function renderDashTopProductos() {
+  const el = document.getElementById('dash-top-productos'); if (!el) return;
+  try {
+    const { data } = await db.from('bs_ventas_detalle').select('perfume_id, cantidad, bs_perfumes(nombre)').limit(500);
+    if (!data || !data.length) { el.innerHTML = '<div class="empty-state" style="padding:24px"><p>Sin datos de ventas</p></div>'; return; }
+    const conteo = {};
+    data.forEach(d => {
+      if (!d.perfume_id) return;
+      const nombre = d.bs_perfumes?.nombre || 'Desconocido';
+      conteo[nombre] = (conteo[nombre] || 0) + (d.cantidad || 1);
+    });
+    const top = Object.entries(conteo).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    const max = top[0]?.[1] || 1;
+    el.innerHTML = `<div style="padding:12px 16px">${top.map(([nombre,qty],i)=>`
+      <div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;font-size:.78rem;margin-bottom:4px">
+          <span style="color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%">${i+1}. ${nombre}</span>
+          <strong style="color:var(--gold)">${qty} uds</strong>
+        </div>
+        <div style="height:4px;background:var(--darker);border-radius:2px">
+          <div style="height:100%;width:${Math.round(qty/max*100)}%;background:var(--gold);border-radius:2px;transition:width .4s"></div>
+        </div>
+      </div>`).join('')}</div>`;
+  } catch(e) { el.innerHTML = '<div class="empty-state" style="padding:24px"><p>Error al cargar</p></div>'; }
+}
+
+function renderDashDesglose() {
+  const el = document.getElementById('dash-desglose'); if (!el) return;
+  if (!ventas.length) { el.innerHTML = '<div class="empty-state" style="padding:24px"><p>Sin ventas</p></div>'; return; }
+  const tipos = { contado: 0, apartado: 0, credito: 0 };
+  ventas.filter(v => v.estatus !== 'devuelta').forEach(v => { if (tipos[v.tipo] !== undefined) tipos[v.tipo] += Number(v.total||0); });
+  const total = Object.values(tipos).reduce((a,b)=>a+b,0) || 1;
+  const colores = { contado:'#4CAF7C', apartado:'#E0A84C', credito:'var(--gold)' };
+  const etiquetas = { contado:'Contado', apartado:'Apartado', credito:'Crédito' };
+  el.innerHTML = `<div style="padding:16px">
+    <div style="display:flex;height:24px;border-radius:6px;overflow:hidden;margin-bottom:16px">
+      ${Object.entries(tipos).filter(([,v])=>v>0).map(([tipo,val])=>`<div style="width:${Math.round(val/total*100)}%;background:${colores[tipo]}" title="${etiquetas[tipo]}: $${val.toFixed(0)}"></div>`).join('')}
+    </div>
+    ${Object.entries(tipos).map(([tipo,val])=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:10px;height:10px;border-radius:50%;background:${colores[tipo]}"></div>
+          <span style="font-size:.8rem;color:var(--text-dim)">${etiquetas[tipo]}</span>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:.85rem;color:var(--gold);font-weight:600">$${val.toFixed(0)}</div>
+          <div style="font-size:.65rem;color:var(--text-muted)">${Math.round(val/total*100)}%</div>
+        </div>
+      </div>`).join('')}
+  </div>`;
+}
+
+// ===================== PERFIL CLIENTE =====================
+async function verPerfilCliente(clienteId) {
+  const c = clientes.find(x => x.id == clienteId); if (!c) return;
+  document.getElementById('perfil-avatar').textContent = c.nombre.charAt(0).toUpperCase();
+  document.getElementById('perfil-nombre').textContent = c.nombre;
+  document.getElementById('perfil-contacto').textContent = [c.telefono, c.correo, c.direccion].filter(Boolean).join(' · ') || 'Sin contacto';
+  document.getElementById('perfil-stats').innerHTML = '<div class="stat-card" style="padding:12px"><div class="stat-label">Compras</div><div class="stat-value" style="font-size:1.4rem" id="ps-compras">—</div></div><div class="stat-card" style="padding:12px"><div class="stat-label">Total Gastado</div><div class="stat-value" style="font-size:1.4rem" id="ps-total">—</div></div><div class="stat-card" style="padding:12px"><div class="stat-label">Saldo Pendiente</div><div class="stat-value" style="font-size:1.4rem" id="ps-saldo">—</div></div>';
+  document.getElementById('perfil-pendientes').innerHTML = '<div style="color:var(--text-muted);font-size:.8rem">Cargando...</div>';
+  document.getElementById('perfil-historial').innerHTML = '<div style="color:var(--text-muted);font-size:.8rem">Cargando...</div>';
+  if (c.telefono) {
+    const btn = document.getElementById('perfil-wa-btn');
+    btn.style.display = '';
+    btn.onclick = () => abrirWhatsApp(c.id, c.nombre, c.telefono, 0);
+  } else {
+    document.getElementById('perfil-wa-btn').style.display = 'none';
+  }
+  openModal('modal-cliente-perfil');
+  const [{ data: vts }, { data: aps }, { data: crs }] = await Promise.all([
+    db.from('bs_ventas').select('*').eq('cliente_id', clienteId).order('fecha', { ascending: false }).limit(10),
+    db.from('bs_apartados').select('*').eq('cliente_id', clienteId).eq('estatus','activo'),
+    db.from('bs_creditos').select('*').eq('cliente_id', clienteId).eq('estatus','activo')
+  ]);
+  const totalGastado = (vts||[]).filter(v=>v.estatus!=='devuelta').reduce((s,v)=>s+Number(v.total),0);
+  const saldoPendiente = ((aps||[]).reduce((s,x)=>s+Number(x.saldo),0))+((crs||[]).reduce((s,x)=>s+Number(x.saldo),0));
+  document.getElementById('ps-compras').textContent = (vts||[]).length;
+  document.getElementById('ps-total').textContent = '$' + totalGastado.toFixed(0);
+  document.getElementById('ps-saldo').textContent = saldoPendiente > 0 ? '$' + saldoPendiente.toFixed(0) : '—';
+  document.getElementById('ps-saldo').style.color = saldoPendiente > 0 ? '#E05C5C' : 'var(--gold)';
+  const pendEl = document.getElementById('perfil-pendientes');
+  const pendientes = [...(aps||[]).map(a=>({tipo:'Apartado',desc:a.notas||getPerfumeNombre(a.perfume_id),saldo:a.saldo,color:'badge-yellow'})), ...(crs||[]).map(cr=>({tipo:'Crédito',desc:cr.notas||getPerfumeNombre(cr.perfume_id),saldo:cr.saldo,color:'badge-gold'}))];
+  pendEl.innerHTML = pendientes.length ? pendientes.map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--darker);border-radius:8px;margin-bottom:6px;font-size:.8rem"><div><span class="badge ${p.color}" style="margin-right:8px">${p.tipo}</span>${p.desc}</div><strong class="price">$${Number(p.saldo).toFixed(2)}</strong></div>`).join('') : '<div style="font-size:.78rem;color:var(--text-muted);padding:8px 0">Sin apartados ni créditos activos</div>';
+  const histEl = document.getElementById('perfil-historial');
+  histEl.innerHTML = (vts||[]).length ? `<table><tbody>${(vts||[]).slice(0,8).map(v=>`<tr><td style="font-size:.72rem;color:var(--text-muted)">${new Date(v.fecha).toLocaleDateString('es-MX')}</td><td><span class="badge badge-gold">${v.tipo}</span></td><td class="price">$${Number(v.total).toFixed(2)}</td><td><span class="badge ${v.estatus==='completada'?'badge-green':v.estatus==='devuelta'?'badge-red':'badge-yellow'}">${v.estatus}</span></td></tr>`).join('')}</tbody></table>` : '<div style="font-size:.78rem;color:var(--text-muted);padding:8px 0">Sin compras registradas</div>';
 }
 async function updateBadges() {
   const { count: ca } = await db.from('bs_apartados').select('id', { count:'exact', head:true }).eq('estatus','activo');
