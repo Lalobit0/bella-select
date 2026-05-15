@@ -313,6 +313,7 @@
           <div style="display:flex;gap:8px">
             <button class="btn btn-outline" onclick="setView('list')">≡ Lista</button>
             <button class="btn btn-outline" onclick="setView('grid')">⊞ Grid</button>
+            <button class="btn btn-outline btn-sm" id="btn-ajuste-precios" style="display:none" onclick="abrirAjustePrecios()">⚡ Precios</button>
             <button class="btn btn-gold" onclick="openModal('modal-perfume')">+ Perfume</button>
           </div>
         </div>
@@ -410,8 +411,8 @@
           <div class="table-header"><div class="table-title">Todas las Ventas</div>
             <input type="date" id="filtro-fecha" onchange="renderHistorial()" style="width:auto">
           </div>
-          <table><thead><tr><th>#</th><th>Fecha</th><th>Cliente</th><th>Items</th><th>Total</th><th>Tipo</th><th>Estatus</th></tr></thead>
-          <tbody id="tabla-historial"><tr><td colspan="7"><div class="loading"><div class="spinner"></div></div></td></tr></tbody></table>
+          <table><thead><tr><th>#</th><th>Fecha</th><th>Cliente</th><th>Items</th><th>Total</th><th>Tipo</th><th>Estatus</th><th id="th-acciones-hist" style="display:none">Acciones</th></tr></thead>
+          <tbody id="tabla-historial"><tr><td colspan="8"><div class="loading"><div class="spinner"></div></div></td></tr></tbody></table>
         </div>
       </div>
 
@@ -797,6 +798,63 @@
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modal-elec')">Cancelar</button>
       <button class="btn btn-gold" id="btn-guardar-elec" onclick="guardarElec()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL AJUSTE PRECIOS EN MASA -->
+<div class="modal-overlay" id="modal-ajuste-precios">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">⚡ Actualizar Precios en Masa</div><button class="modal-close" onclick="closeModal('modal-ajuste-precios')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Aplicar a</label>
+          <select id="ap-scope" onchange="actualizarPreciosPreview()">
+            <option value="all">Todos los perfumes</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Tipo de ajuste</label>
+          <select id="ap-tipo" onchange="actualizarPreciosPreview()">
+            <option value="pct_inc">Incremento %</option>
+            <option value="pct_dec">Descuento %</option>
+            <option value="fixed_inc">Suma fija $</option>
+            <option value="fixed_dec">Resta fija $</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Valor</label>
+          <input type="number" id="ap-valor" placeholder="ej. 10" min="0" step="0.01" oninput="actualizarPreciosPreview()">
+        </div>
+        <div class="form-group full" style="background:var(--darker);padding:12px 16px;border-radius:8px">
+          <div id="ap-preview" style="font-size:.85rem;color:var(--text-muted)">Ingresa un valor para ver la vista previa</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-ajuste-precios')">Cancelar</button>
+      <button class="btn btn-gold" onclick="aplicarAjustePrecios()">Aplicar a todos</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DEVOLUCION -->
+<div class="modal-overlay" id="modal-devolucion">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header"><div class="modal-title">↩ Procesar Devolución</div><button class="modal-close" onclick="closeModal('modal-devolucion')">✕</button></div>
+    <div class="modal-body">
+      <div id="dev-venta-info" style="background:var(--darker);padding:10px 16px;border-radius:8px;margin-bottom:14px;font-size:.83rem"></div>
+      <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:8px">Selecciona los productos a devolver:</div>
+      <div id="dev-items" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>Motivo de devolución</label>
+        <input type="text" id="dev-motivo" placeholder="ej. Producto defectuoso, cambio de talla...">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-devolucion')">Cancelar</button>
+      <button class="btn btn-gold" onclick="procesarDevolucion()">Confirmar Devolución</button>
     </div>
   </div>
 </div>
@@ -1438,8 +1496,14 @@ async function renderHistorial() {
   if (fecha) query = query.gte('fecha', fecha + 'T00:00:00').lte('fecha', fecha + 'T23:59:59');
   const { data } = await query;
   if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><span class="icon">◎</span><p>Sin ventas</p></div></td></tr>'; return; }
+  const esAdmin = currentUserRol === 'admin';
+  const thAcc = document.getElementById('th-acciones-hist');
+  if (thAcc) thAcc.style.display = esAdmin ? '' : 'none';
   tbody.innerHTML = data.map(v => {
     const cl = clientes.find(c => c.id == v.cliente_id);
+    const accionesCol = esAdmin
+      ? `<td>${v.estatus === 'completada' ? `<button class="btn btn-outline btn-sm" onclick="abrirDevolucion(${v.id})">↩ Dev.</button>` : '—'}</td>`
+      : '';
     return `<tr>
       <td>#${String(v.id).slice(-4)}</td>
       <td>${new Date(v.fecha).toLocaleDateString('es-MX')}</td>
@@ -1447,7 +1511,8 @@ async function renderHistorial() {
       <td>${v.bs_ventas_detalle?.[0]?.count || '—'}</td>
       <td class="price">$${Number(v.total).toFixed(2)}</td>
       <td><span class="badge badge-gold">${v.tipo}</span></td>
-      <td><span class="badge ${v.estatus==='completada'?'badge-green':'badge-yellow'}">${v.estatus}</span></td>
+      <td><span class="badge ${v.estatus==='completada'?'badge-green':v.estatus==='devuelta'?'badge-red':'badge-yellow'}">${v.estatus}</span></td>
+      ${accionesCol}
     </tr>`;
   }).join('');
 }
@@ -2077,16 +2142,19 @@ function iniciarApp() {
   const navMisVentas = document.getElementById('nav-mis-ventas');
   const navVV = document.getElementById('nav-ventas-vendedores');
   const navUsuarios = document.getElementById('nav-usuarios');
+  const btnAjustePrecios = document.getElementById('btn-ajuste-precios');
   if (currentUserRol === 'admin') {
     navLog.style.display = '';
     if (navMisVentas) navMisVentas.style.display = 'none';
     if (navVV) navVV.style.display = '';
     if (navUsuarios) navUsuarios.style.display = '';
+    if (btnAjustePrecios) btnAjustePrecios.style.display = '';
   } else {
     navLog.style.display = 'none';
     if (navMisVentas) navMisVentas.style.display = '';
     if (navVV) navVV.style.display = 'none';
     if (navUsuarios) navUsuarios.style.display = 'none';
+    if (btnAjustePrecios) btnAjustePrecios.style.display = 'none';
   }
   // Aplicar restricciones de rol al DOM después de render
   applyRoleRestrictions();
@@ -2295,6 +2363,122 @@ async function reimprimirComprobante(ventaId) {
     semanas: v.semanas || 4
   };
   generarComprobante(v, items, r);
+}
+
+// ===================== AJUSTE PRECIOS EN MASA =====================
+function abrirAjustePrecios() {
+  const sel = document.getElementById('ap-scope');
+  sel.innerHTML = '<option value="all">Todos los perfumes</option>';
+  marcas.forEach(m => {
+    const count = perfumes.filter(p => p.marca_id == m.id).length;
+    if (count > 0) sel.innerHTML += `<option value="${m.id}">${m.nombre} (${count})</option>`;
+  });
+  document.getElementById('ap-valor').value = '';
+  document.getElementById('ap-preview').textContent = 'Ingresa un valor para ver la vista previa';
+  openModal('modal-ajuste-precios');
+}
+
+function actualizarPreciosPreview() {
+  const scope = document.getElementById('ap-scope').value;
+  const tipo = document.getElementById('ap-tipo').value;
+  const valor = parseFloat(document.getElementById('ap-valor').value) || 0;
+  const lista = scope === 'all' ? perfumes : perfumes.filter(p => p.marca_id == scope);
+  if (!lista.length || valor <= 0) { document.getElementById('ap-preview').textContent = 'Ingresa un valor para ver la vista previa'; return; }
+  const precios = lista.map(p => {
+    const base = Number(p.precio_venta);
+    if (tipo === 'pct_inc') return base * (1 + valor/100);
+    if (tipo === 'pct_dec') return base * (1 - valor/100);
+    if (tipo === 'fixed_inc') return base + valor;
+    if (tipo === 'fixed_dec') return Math.max(0, base - valor);
+    return base;
+  });
+  const promAntes = lista.reduce((s,p) => s + Number(p.precio_venta), 0) / lista.length;
+  const promDespues = precios.reduce((a,b) => a+b, 0) / precios.length;
+  const tipoLabel = { pct_inc:`+${valor}%`, pct_dec:`-${valor}%`, fixed_inc:`+$${valor}`, fixed_dec:`-$${valor}` }[tipo];
+  document.getElementById('ap-preview').innerHTML =
+    `<strong>${lista.length}</strong> productos afectados · Precio promedio: <span style="color:var(--text-muted)">$${promAntes.toFixed(2)}</span> → <span style="color:var(--gold)">$${promDespues.toFixed(2)}</span> (${tipoLabel})`;
+}
+
+async function aplicarAjustePrecios() {
+  const scope = document.getElementById('ap-scope').value;
+  const tipo = document.getElementById('ap-tipo').value;
+  const valor = parseFloat(document.getElementById('ap-valor').value) || 0;
+  if (valor <= 0) { toast('Ingresa un valor válido', 'error'); return; }
+  const lista = scope === 'all' ? perfumes : perfumes.filter(p => p.marca_id == scope);
+  if (!lista.length) { toast('Sin productos en el rango seleccionado', 'error'); return; }
+  const tipoLabel = { pct_inc:`+${valor}%`, pct_dec:`-${valor}%`, fixed_inc:`+$${valor}`, fixed_dec:`-$${valor}` }[tipo];
+  if (!confirm(`¿Aplicar ajuste de precios (${tipoLabel}) a ${lista.length} productos?`)) return;
+  let actualizados = 0;
+  for (const p of lista) {
+    const base = Number(p.precio_venta);
+    let nuevo;
+    if (tipo === 'pct_inc') nuevo = base * (1 + valor/100);
+    else if (tipo === 'pct_dec') nuevo = base * (1 - valor/100);
+    else if (tipo === 'fixed_inc') nuevo = base + valor;
+    else nuevo = Math.max(0, base - valor);
+    await db.from('bs_perfumes').update({ precio_venta: Math.round(nuevo * 100) / 100 }).eq('id', p.id);
+    actualizados++;
+  }
+  registrarLog('editar', 'perfumes', `Ajuste precios en masa (${tipoLabel}) — ${actualizados} productos`, { tipo, valor, scope, actualizados });
+  toast(`Precios actualizados: ${actualizados} productos`, 'success');
+  closeModal('modal-ajuste-precios');
+  await loadPerfumes();
+  renderInventario();
+}
+
+// ===================== DEVOLUCIONES =====================
+let devTarget = null;
+
+async function abrirDevolucion(ventaId) {
+  devTarget = { ventaId, items: [] };
+  const infoEl = document.getElementById('dev-venta-info');
+  const itemsEl = document.getElementById('dev-items');
+  infoEl.innerHTML = '<div class="loading" style="padding:0"><div class="spinner" style="width:16px;height:16px;margin-right:8px"></div>Cargando...</div>';
+  itemsEl.innerHTML = '';
+  openModal('modal-devolucion');
+  document.getElementById('dev-motivo').value = '';
+  const { data: venta } = await db.from('bs_ventas').select('*, bs_ventas_detalle(*, bs_perfumes(id, nombre, stock))').eq('id', ventaId).single();
+  if (!venta) { infoEl.innerHTML = 'Error al cargar la venta'; return; }
+  const cl = clientes.find(c => c.id == venta.cliente_id);
+  infoEl.innerHTML = `<strong>#${String(venta.id).slice(-4)}</strong> · ${new Date(venta.fecha).toLocaleDateString('es-MX')} · ${cl ? cl.nombre : 'Directo'} · <span class="price">$${Number(venta.total).toFixed(2)}</span>`;
+  const detalles = venta.bs_ventas_detalle || [];
+  devTarget.items = detalles.map(d => ({ detalleId: d.id, perfumeId: d.perfume_id, nombre: d.bs_perfumes?.nombre || 'Producto', qty: d.cantidad, precio: Number(d.precio_unitario), stockActual: d.bs_perfumes?.stock ?? null }));
+  if (!devTarget.items.length) {
+    itemsEl.innerHTML = '<div style="font-size:.8rem;color:var(--text-muted);padding:8px 0">Venta sin detalle de productos (puede ser electrónico). Se marcará como devuelta sin restaurar stock.</div>';
+  } else {
+    itemsEl.innerHTML = devTarget.items.map((item, i) => `
+      <label style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--darker);border-radius:8px;cursor:pointer">
+        <input type="checkbox" id="dev-chk-${i}" value="${i}" checked style="width:16px;height:16px;accent-color:var(--gold)">
+        <div style="flex:1">
+          <div style="font-size:.85rem;font-weight:500">${item.nombre}</div>
+          <div style="font-size:.75rem;color:var(--text-muted)">Cant: ${item.qty} · $${item.precio.toFixed(2)} c/u</div>
+        </div>
+        <span class="price" style="font-size:.85rem">$${(item.qty * item.precio).toFixed(2)}</span>
+      </label>`).join('');
+  }
+}
+
+async function procesarDevolucion() {
+  if (!devTarget) return;
+  const motivo = document.getElementById('dev-motivo').value.trim() || 'Sin motivo especificado';
+  const itemsSeleccionados = devTarget.items.filter((_, i) => {
+    const chk = document.getElementById(`dev-chk-${i}`);
+    return chk ? chk.checked : false;
+  });
+  for (const item of itemsSeleccionados) {
+    if (item.perfumeId && item.stockActual !== null) {
+      await db.from('bs_perfumes').update({ stock: item.stockActual + item.qty }).eq('id', item.perfumeId);
+    }
+  }
+  await db.from('bs_ventas').update({ estatus: 'devuelta' }).eq('id', devTarget.ventaId);
+  const nombres = itemsSeleccionados.length ? itemsSeleccionados.map(i => i.nombre).join(', ') : 'Todos los productos';
+  registrarLog('editar', 'ventas', `Devolución venta #${String(devTarget.ventaId).slice(-4)}: ${nombres} — ${motivo}`, { ventaId: devTarget.ventaId, motivo, itemsDevueltos: itemsSeleccionados.length });
+  toast('Devolución registrada y stock restaurado', 'success');
+  closeModal('modal-devolucion');
+  devTarget = null;
+  renderHistorial();
+  await loadPerfumes();
+  updateDashStats();
 }
 
 // ===================== WHATSAPP PLANTILLAS =====================
